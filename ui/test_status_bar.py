@@ -56,6 +56,13 @@ def verify_status_bar(test, browser, evaluate, ipc):
         test.assertTrue(evaluate(f"r = document.querySelector('#status-bar').getBoundingClientRect(); r.bottom === innerHeight && r.height === {44 if width == 375 else 24} && document.documentElement.scrollWidth <= innerWidth && [...document.querySelectorAll('#status-bar button:not([hidden])')].every(b=>b.getBoundingClientRect().height >= {44 if width == 375 else 20})"))
         if width == 375:
             test.assertEqual(evaluate("[...document.querySelectorAll('.sb-provider')].filter(b=>!b.hidden).length"), 1)
+        if name.startswith('normal-bar-1280'):
+            test.assertGreater(evaluate("document.querySelectorAll('.sb-provider:not([hidden])').length"), 1)
+        if width == 375:
+            test.assertEqual(evaluate("document.querySelector('#sb-overflow>span').getBoundingClientRect().height"), 18)
+        if view == 'roster':
+            test.assertEqual(evaluate("document.querySelectorAll('#sb-roster button').length"), 11 if name.startswith('signed-out') else 0)
+            test.assertEqual(evaluate("getComputedStyle(document.querySelector('#sb-roster .sb-window+.sb-window'), '::before').content") if evaluate("!!document.querySelector('#sb-roster .sb-window+.sb-window')") else 'none', 'none')
         if not reference:
             return
         snapshot = rpc(dict(action='snapshot'))['snapshot']
@@ -65,7 +72,7 @@ def verify_status_bar(test, browser, evaluate, ipc):
             status = {'loading': 'idle', 'off': 'unavailable', 'refreshing': 'fetching', 'ready': 'ok'}.get(phase, 'error')
             cached = phase not in ['loading', 'off', 'error_no_cache', 'not_signed_in']
             limits = [dict(usedPercent=w['percent_used'] or 0, windowMinutes=300 if w['label'] == '5h' else 10080, resetsAt=datetime.fromisoformat(w['reset_at_iso'].replace('Z', '+00:00')).timestamp()*1000) for w in provider['windows']] if cached else []
-            upstream.append(dict(provider=provider['id'], status=status, plan=provider['plan'], updatedAt=(provider['updated_at'] or 0)*1000, error='not signed in' if phase == 'not_signed_in' else 'Refresh failed' if status == 'error' else None, session=limits[0] if limits else None, weekly=limits[1] if len(limits)>1 else None))
+            upstream.append(dict(provider=provider['id'], status=status, planType=provider['plan'], updatedAt=(provider['updated_at'] or 0)*1000, error='not signed in' if phase == 'not_signed_in' else 'Refresh failed' if status == 'error' else None, session=limits[0] if limits else None, weekly=limits[1] if len(limits)>1 else None))
         enabled = [{'resources':'resource-usage','hosts':'ssh'}.get(k,k) for k, value in snapshot['visibility'].items() if value]
         query = urlencode(dict(id='status-bar/orquesta-reference:reference', theme=theme, view=view, state='fetching' if any(p['phase']=='refreshing' for p in snapshot['providers']) else 'ok', mode=snapshot['display_mode'], items=json.dumps(enabled), providers=json.dumps(upstream)))
         ref('open', f'http://127.0.0.1:5179/fixtures.html?{query}')

@@ -48,7 +48,6 @@
     const refreshing = busy.size > 0 || !!state?.snapshot.providers.some(provider => provider.phase === 'refreshing');
     get('sb-refresh').disabled = !state?.refresh_providers?.length || refreshing;
     get('sb-refresh').classList.toggle('sb-refreshing', refreshing);
-    for (const provider of state?.snapshot.providers || []) if (roster.has(provider.id)) roster.get(provider.id).querySelector('button').disabled = (provider.phase !== 'not_signed_in' && !canRefresh(provider)) || busy.has(provider.id) || provider.phase === 'refreshing';
   }
   async function refreshProvider(provider) {
     if (busy.has(provider.id) || !canRefresh(provider)) return;
@@ -73,7 +72,7 @@
     const content = get('sb-detail-content'); content.replaceChildren();
     get('sb-detail-title').textContent = kind === 'accounts' ? 'Manage accounts…' : kind === 'history' ? 'Usage details & history' : labels[kind];
     if (kind === 'accounts') content.append(node('p', "Account controls aren’t available yet."));
-    else if (kind === 'history') content.append(node('p', "Current usage is shown here. History isn’t available yet."));
+    else if (kind === 'history') content.append(node('p', "Usage history isn’t available yet."));
     else content.append(node('p', kind === 'resources' ? `Host load: ${state.resources?.load ?? 'unknown'}` : Object.hasOwn(state.snapshot.inventory, kind) ? state.snapshot.inventory[kind].join(', ') || 'None' : 'Inventory is not connected.'));
     get('sb-details').showModal();
   }
@@ -89,6 +88,7 @@
           label.append(input, node('span', name)); container.append(label); controls.set(id, input);
         }
         controls.get(id).checked = state.snapshot.visibility[key] !== false;
+        container.insertBefore(controls.get(id).parentElement, container.querySelector('[data-mode]')?.parentElement || null);
       }
       if (!container.querySelector('[data-mode]')) for (const [mode, name, description] of [['compact', 'Compact', 'Condensed usage: one summary per provider'], ['detailed', 'Detailed', 'Full usage with bars, labels, and percentages']]) {
         const label = node('label'), input = Object.assign(node('input'), { type: 'radio', name: `${container.parentElement.id}-mode`, value: mode }); input.dataset.mode = mode;
@@ -103,9 +103,7 @@
       chip = node('button', '', 'sb-provider'); chip.dataset.id = provider.id; chip.popoverTargetElement = usage;
       get('sb-providers').insertBefore(chip, get('sb-overflow')); providers.set(provider.id, chip);
       row = node('section', '', 'sb-row'); row.dataset.id = provider.id; get('sb-roster').append(row); roster.set(provider.id, row);
-      const refresh = node('button', 'Refresh');
-      refresh.onclick = () => { const current = state.snapshot.providers.find(item => item.id === provider.id); if (current.phase === 'not_signed_in') details('accounts'); else refreshProvider(current).catch(() => {}); };
-      row.append(node('strong', provider.name), node('span', '', 'sb-plan'), node('div', '', 'sb-metrics'), refresh);
+      row.append(node('strong', provider.name), node('span', '', 'sb-plan'), node('div', '', 'sb-metrics'));
     }
     const phase = provider.phase === 'loading' && !canRefresh(provider) ? 'off' : provider.phase;
     chip.hidden = state.snapshot.visibility[provider.id] === false;
@@ -113,7 +111,6 @@
     chip.dataset.tone = tone(max(provider)); chip.dataset.phase = phase;
     chip.replaceChildren(node('span', letters[provider.id] || provider.name[0], 'sb-letter'));
     const empty = { loading: '···', off: '--', not_signed_in: 'Sign in', error_no_cache: 'Refresh failed' }[phase];
-    if (['stale', 'error_cached', 'error_no_cache'].includes(phase)) chip.append(node('span', '⚠︎', 'sb-warning'));
     const tightest = provider.windows.reduce((a, b) => !a || (b.percent_used ?? -1) > (a.percent_used ?? -1) ? b : a, null);
     const chipWindows = state.snapshot.display_mode === 'compact' && tightest ? [tightest] : provider.windows;
     if (!empty && tightest) chip.append(meter(tightest));
@@ -123,6 +120,7 @@
       const value = node('span', percent(window.percent_used), 'sb-number'); value.dataset.tone = tone(window.percent_used);
       part.append(value, node('span', window.label, 'sb-window-label')); chip.append(part);
     }
+    if (['stale', 'error_cached', 'error_no_cache'].includes(phase)) chip.append(node('span', '⚠︎', 'sb-warning'));
     const indicator = node('span', phase === 'refreshing' ? '↻' : '', 'sb-indicator');
     indicator.classList.toggle('sb-refreshing', phase === 'refreshing');
     chip.append(indicator);
@@ -140,7 +138,10 @@
         line.append(meter(window), value, node('span', window.label), reset); metrics.append(line);
       }
       if (['stale', 'error_cached'].includes(phase)) metrics.append(node('p', phase === 'stale' ? (age(provider) ? `⚠︎ Updated ${age(provider)} ago` : '⚠︎ Update time unavailable') : '⚠︎ Refresh failed — showing cached data'));
-      const refresh = row.querySelector('button'); refresh.textContent = phase === 'not_signed_in' ? 'Sign in' : 'Refresh'; refresh.disabled = phase === 'refreshing' || busy.has(provider.id);
+      row.querySelector('button')?.remove();
+      if (phase === 'not_signed_in') {
+        const signIn = node('button', 'Sign in'); signIn.onclick = () => details('accounts'); row.append(signIn);
+      }
     }
     const before = previous.get(provider.id), current = max(provider);
     if (before != null && before < 80 && current >= 80) get('sb-announcement').textContent = `${provider.name} usage ${percent(current)} is urgent.`;
@@ -162,12 +163,16 @@
     const fits = () => get('sb-providers').scrollWidth <= get('sb-providers').clientWidth;
     if (!fits()) bar.dataset.density = 'compact';
     if (!fits()) bar.dataset.density = 'tight';
-    if (!fits() || innerWidth <= 500) {
-      const highest = [...visible].sort((a, b) => max(b) - max(a))[0];
-      visible.forEach(provider => providers.get(provider.id).hidden = provider !== highest);
-      const hidden = visible.filter(provider => provider !== highest); overflow.hidden = !hidden.length; overflow.textContent = `+${hidden.length}`; overflow.title = `Also: ${hidden.map(provider => `${provider.name} ${percent(max(provider) < 0 ? null : max(provider))}`).join(', ')}`; overflow.dataset.tone = tone(Math.max(-1, ...hidden.map(max))); overflow.ariaLabel = overflow.title;
-      bar.dataset.density = 'fold';
+    const hidden = [];
+    const highest = [...visible].sort((a, b) => max(b) - max(a))[0];
+    const candidates = [...visible].reverse().sort((a, b) => (max(a) >= 80) - (max(b) >= 80));
+    for (const provider of candidates) {
+      if (innerWidth <= 500 ? provider === highest : fits()) continue;
+      providers.get(provider.id).hidden = true; hidden.push(provider);
+      overflow.hidden = false; overflow.replaceChildren(node('span', `+${hidden.length}`));
     }
+    overflow.title = `Also: ${hidden.map(provider => `${provider.name} ${percent(max(provider) < 0 ? null : max(provider))}`).join(', ')}`;
+    overflow.dataset.tone = tone(Math.max(-1, ...hidden.map(max))); overflow.ariaLabel = overflow.title;
     if (!fits() || innerWidth <= 500) bar.dataset.density = 'icons';
   }
   function countdowns() {
@@ -184,9 +189,9 @@
       let button = get(`sb-${key}`);
       if (!button) { button = node('button'); button.id = `sb-${key}`; button.onclick = () => details(key); get('sb-segments').insertBefore(button, get('sb-items')); }
       const known = key === 'resources' ? state.resources?.load != null : Object.hasOwn(state.snapshot.inventory, key);
-      const count = known ? (key === 'resources' ? state.resources.load.toFixed(1) : state.counts[key]) : '?';
+      const count = known ? (key === 'resources' ? state.resources.load.toFixed(1) : state.counts[key]) : '--';
       button.replaceChildren(icon(key), node('span', `${count}`), node('span', key === 'hosts' && known ? 'connected' : key === 'resources' ? 'load' : key, 'sb-segment-name'));
-      button.ariaLabel = !known ? `${name} unavailable` : key === 'resources' ? `Host load, ${count === '?' ? 'unknown' : count}` : key === 'ports' ? `Ports, ${count} workspace ports` : `${count} ${key === 'hosts' ? 'connected remote hosts' : name.toLowerCase()}`; button.title = button.ariaLabel; button.hidden = state.snapshot.visibility[key] === false;
+      button.ariaLabel = !known ? `${name} unavailable` : key === 'resources' ? `Host load, ${count === '--' ? 'unknown' : count}` : key === 'ports' ? `Ports, ${count} workspace ports` : `${count} ${key === 'hosts' ? 'connected remote hosts' : name.toLowerCase()}`; button.title = button.ariaLabel; button.hidden = state.snapshot.visibility[key] === false;
     }
     countdowns(); refreshState(); fit();
   }
