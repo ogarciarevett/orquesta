@@ -14,6 +14,9 @@ pub struct Request {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "command", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Operation {
+    StatusBar {
+        action: crate::status_bar::Action,
+    },
     Send {
         envelope: Envelope,
     },
@@ -70,6 +73,7 @@ impl Runtime {
             Ok(json!(message))
         };
         let result = match request.operation {
+            Operation::StatusBar { action } => self.0.status_bar(action)?,
             Operation::Send { envelope } => deliver(envelope)?,
             Operation::Ask { mut envelope } => {
                 envelope.kind = "question".into();
