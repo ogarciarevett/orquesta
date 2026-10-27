@@ -166,21 +166,16 @@ fn malformed_storage_and_obstructed_write_never_reset_state() -> Result<()> {
     mailbox.automation_save(0, None, draft())?;
     let before = fixture.bytes();
     let original: Value = serde_json::from_slice(&before)?;
-    for pointer in [
-        "/automations/schema",
-        "/automations/counter",
-        "/automations/revision",
-        "/automations/definitions/0/draft/path",
-        "/automations/definitions/0/draft/schedule/host",
+    for (pointer, value) in [
+        ("/automations/schema", json!(2)),
+        ("/automations/counter", json!(u64::MAX)),
+        ("/automations/revision", json!(u64::MAX)),
+        ("/automations/definitions/0/draft/path", json!("/tmp")),
+        ("/automations/definitions/0/draft/schedule/host", json!("local")),
     ] {
         let mut state = original.clone();
-        if pointer.ends_with("path") {
-            state["automations"]["definitions"][0]["draft"]["path"] = json!("/tmp");
-        } else if pointer.ends_with("host") {
-            state["automations"]["definitions"][0]["draft"]["schedule"]["host"] = json!("local");
-        } else {
-            *state.pointer_mut(pointer).unwrap() = json!(u64::MAX);
-        }
+        let (parent, field) = pointer.rsplit_once('/').unwrap();
+        state.pointer_mut(parent).unwrap()[field] = value;
         fixture.write(&state);
         let invalid = fixture.bytes();
         assert!(mailbox.automation_save(u64::MAX, None, draft()).is_err());
