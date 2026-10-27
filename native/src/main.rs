@@ -8,24 +8,24 @@ const RECIPIENT: &str = "session:s";
 #[derive(Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 enum DesktopRequest {
-    Inbox,
-    Read,
-    Reconnect,
+    Inbox {},
+    Read {},
+    Reconnect {},
     Ack { id: u64 },
-    Status,
+    Status {},
     Visibility { key: String, visible: bool },
     Display { mode: DisplayMode },
-    Refresh,
+    Refresh {},
 }
 fn dispatch(runtime: &Runtime, request: DesktopRequest) -> Result<Value, String> {
     let operation = match request {
-        DesktopRequest::Inbox => Operation::Inbox { recipient: Some(RECIPIENT.into()) },
-        DesktopRequest::Read | DesktopRequest::Reconnect => Operation::Check { recipient: RECIPIENT.into(), peek: false },
+        DesktopRequest::Inbox {} => Operation::Inbox { recipient: Some(RECIPIENT.into()) },
+        DesktopRequest::Read {} | DesktopRequest::Reconnect {} => Operation::Check { recipient: RECIPIENT.into(), peek: false },
         DesktopRequest::Ack { id } => Operation::Ack { recipient: RECIPIENT.into(), id },
-        DesktopRequest::Status => Operation::StatusBar { action: Action::Snapshot },
+        DesktopRequest::Status {} => Operation::StatusBar { action: Action::Snapshot },
         DesktopRequest::Visibility { key, visible } => Operation::StatusBar { action: Action::Visibility { key, visible } },
         DesktopRequest::Display { mode } => Operation::StatusBar { action: Action::Display { mode } },
-        DesktopRequest::Refresh => return Err("Usage refresh unavailable on this host".into()),
+        DesktopRequest::Refresh {} => return Err("Usage refresh unavailable on this host".into()),
     };
     let mut result = runtime.call(operation).map_err(|error| error.to_string())?.result;
     if let Some(object) = result.as_object_mut() {
@@ -98,16 +98,16 @@ mod tests {
         };
         let message = mailbox.send(envelope).unwrap();
         let runtime = Runtime(mailbox);
-        assert_eq!(dispatch(&runtime, DesktopRequest::Inbox).unwrap().as_array().unwrap().len(), 1);
-        dispatch(&runtime, DesktopRequest::Read).unwrap();
-        assert_eq!(dispatch(&runtime, DesktopRequest::Reconnect).unwrap()[0]["id"], message.id);
+        assert_eq!(dispatch(&runtime, DesktopRequest::Inbox {}).unwrap().as_array().unwrap().len(), 1);
+        dispatch(&runtime, DesktopRequest::Read {}).unwrap();
+        assert_eq!(dispatch(&runtime, DesktopRequest::Reconnect {}).unwrap()[0]["id"], message.id);
         dispatch(&runtime, DesktopRequest::Ack { id: message.id }).unwrap();
-        assert_eq!(dispatch(&runtime, DesktopRequest::Reconnect).unwrap(), json!([]));
+        assert_eq!(dispatch(&runtime, DesktopRequest::Reconnect {}).unwrap(), json!([]));
         dispatch(&runtime, DesktopRequest::Visibility { key: "ports".into(), visible: false }).unwrap();
         let reopened = Runtime(Mailbox::open(&directory).unwrap());
-        assert_eq!(dispatch(&reopened, DesktopRequest::Status).unwrap()["snapshot"]["visibility"]["ports"], false);
+        assert_eq!(dispatch(&reopened, DesktopRequest::Status {}).unwrap()["snapshot"]["visibility"]["ports"], false);
         std::fs::write(directory.join("mailbox.json"), "corrupt").unwrap();
-        assert!(dispatch(&reopened, DesktopRequest::Status).is_err());
+        assert!(dispatch(&reopened, DesktopRequest::Status {}).is_err());
         std::fs::remove_dir_all(directory).unwrap();
     }
     #[test]

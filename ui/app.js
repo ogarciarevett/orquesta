@@ -10,7 +10,7 @@ safety.checked = localStorage.getItem(preference + 'notifications') !== 'false';
 safety.onchange = () => { localStorage.setItem(preference + 'notifications', safety.checked); if (!safety.checked) element('notice').textContent = ''; };
 function theme(value) {
   document.documentElement.dataset.theme = value;
-  element('theme').textContent = `Dev: Theme ${value === 'dark' ? 'Dark' : 'Light'}`;
+  element('theme').textContent = `${window.orquestaNative ? 'Theme' : 'Dev: Theme'} ${value === 'dark' ? 'Dark' : 'Light'}`;
 }
 theme(localStorage.getItem(preference + 'theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 element('theme').onclick = () => {
@@ -104,6 +104,6 @@ element('connection').onclick = () => {
   if (!connected) return reconnect();
   connected = false; generation++; element('connection').textContent = 'Reconnect'; element('status').textContent = 'Disconnected'; element('retry').hidden = true;
 };
-element('composer').onsubmit = event => { event.preventDefault(); element('submissions').value = Number(element('submissions').value) + 1; };
+element('composer').onsubmit = event => { event.preventDefault(); if (window.orquestaNative) return; element('submissions').value = Number(element('submissions').value) + 1; };
 refresh();
 setInterval(() => { times(); refresh(); }, 1000);
