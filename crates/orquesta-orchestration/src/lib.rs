@@ -38,6 +38,8 @@ pub struct Message {
 #[derive(Default, Serialize, Deserialize)]
 struct State {
     #[serde(default)]
+    automations: automations::Catalog,
+    #[serde(default)]
     sidebar: sidebar::Catalog,
     #[serde(default)]
     status_bar: status_bar::StatusBar,
@@ -212,6 +214,7 @@ pub struct TerminalDraftBuffer {
 #[cfg(test)]
 mod tests;
 
+pub mod automations;
 pub mod composer;
 pub mod runtime;
 pub mod sidebar;

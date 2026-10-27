@@ -46,7 +46,7 @@ pub enum Preference {
 }
 
 impl Catalog {
-    fn snapshot(&self) -> Snapshot {
+    pub(crate) fn snapshot(&self) -> Snapshot {
         Snapshot {
             revision: self.revision,
             projects: self

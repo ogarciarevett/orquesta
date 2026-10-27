@@ -48,3 +48,22 @@ opens as an overlay so the 280px sidebar retains a 640px main area. At <=920px,
 Projects opens a sheet; selecting a folder or Escape closes it and returns focus.
 Git discovery, remote hosts, filtering, resizing, multi-selection, and live agents
 remain outside this slice; a folder row does not claim Git or agent status.
+
+### Inactive automation drafts (#39, core foundation)
+
+`Mailbox::automation_snapshot` and `automation_save(expected_revision, id, draft)`
+persist interval drafts against a registered project/workspace pair. `None` creates
+a native `automation-N` ID; `Some(id)` replaces a known draft. Names are trimmed
+and limited to 120 UTF-8 bytes; prompts retain their exact bytes, must contain
+non-whitespace text, and are limited to 32 KiB. Intervals are 60–31,536,000 seconds
+with UTC anchors from 0 through 253,402,300,799; at most 128 drafts are stored.
+These are inactive definitions, with no scheduling, timezone validation, execution,
+history, provider configuration, UI, native command, or Runtime forwarding.
+
+Old mailbox files acquire an empty schema-1 catalog while retaining mail and
+preferences. Saves check revision and target membership under the existing lock;
+stale retries conflict instead of duplicating creates. Reload the snapshot before
+retrying any save error: failures after rename can mean the write committed.
+Unknown automation fields/schema and invalid drafts fail without resetting state.
+Do not write this storage with older binaries: they may discard automation data.
+Prompts are private plaintext in mailbox storage; snapshots contain no root fields.
