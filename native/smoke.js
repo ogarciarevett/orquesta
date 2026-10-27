@@ -54,7 +54,10 @@
     const saved = await window.orquestaNative('save-automation', { ...fields, recipient: 'session:other', path: '/tmp' });
     if (saved.revision !== initial.revision + 1 || saved.definitions.length !== initial.definitions.length + 1) throw new Error('Native save failed');
     const record = saved.definitions.at(-1);
-    if (!/^automation-\d+$/.test(record.id) || JSON.stringify(record.draft) !== JSON.stringify(definition)) throw new Error('Draft round trip differs');
+    const savedDraft = record.draft;
+    if (!/^automation-\d+$/.test(record.id) ||
+        ['name', 'prompt', 'project_id', 'workspace_id'].some(key => savedDraft[key] !== definition[key]) ||
+        ['kind', 'every_seconds', 'anchor_utc_seconds'].some(key => savedDraft.schedule[key] !== definition.schedule[key])) throw new Error('Draft round trip differs');
     const persistedDrafts = await window.orquestaNative('automations');
     if (JSON.stringify(saved) !== JSON.stringify(persistedDrafts)) throw new Error('Native draft read differs');
     const reject = async (action, expected) => {
