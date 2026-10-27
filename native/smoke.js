@@ -19,6 +19,7 @@
       if (!rejected) throw new Error('Authority or unavailable operation accepted');
     }
     await new Promise(resolve => setTimeout(resolve, 2200));
+    if (!document.querySelector('#inbox').open || document.querySelector('#status').textContent !== 'Connected') throw new Error('Native inbox UI did not initialize');
     const after = [draft.value, draft.selectionStart, draft.selectionEnd, draft.selectionDirection, document.activeElement];
     if (draft !== document.querySelector('#draft') || before.some((value, index) => value !== after[index]) || document.querySelector('#submissions').value !== '0') throw new Error('Draft changed');
     await invoke('smoke_complete', { success: true, detail: 'WKWebView invoke, persistence, rejection and draft checks passed; no live mail delivery or PTY proof.' });
