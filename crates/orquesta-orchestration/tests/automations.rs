@@ -6,14 +6,32 @@ use orquesta_orchestration::{
     status_bar::Action,
 };
 use serde_json::{Value, json};
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{
+    fs,
+    path::PathBuf,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+};
 
+static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 struct Fixture(PathBuf);
 impl Fixture {
     fn new() -> Result<Self> {
         let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
-        let fixture =
-            Self(std::env::temp_dir().join(format!("automation-{}-{nonce:?}", std::process::id())));
+        let fixture = loop {
+            let sequence = NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed);
+            let root = std::env::temp_dir().join(format!(
+                "automation-{}-{nonce:?}-{sequence}",
+                std::process::id()
+            ));
+            match fs::create_dir(&root) {
+                Ok(()) => break Self(root),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(error.into()),
+            }
+        };
         let mailbox = Mailbox::open(&fixture.0)?;
         for name in ["first", "second"] {
             let folder = fixture.0.join(name);
@@ -89,6 +107,7 @@ fn migration_reopen_and_replacement_preserve_mail_and_preferences() -> Result<()
     assert!(!projection.contains("root"));
     assert!(!projection.contains(fixture.0.to_str().unwrap()));
     assert!(mailbox.automation_save(0, None, draft()).is_err());
+    assert_eq!(mailbox.automation_snapshot()?, saved);
     let mut changed = draft();
     changed.prompt.push_str("Updated\n");
     let replaced = mailbox.automation_save(1, Some("automation-1".into()), changed.clone())?;
@@ -112,16 +131,25 @@ fn concurrent_handles_commit_only_one_revision() -> Result<()> {
             let barrier = barrier.clone();
             std::thread::spawn(move || {
                 barrier.wait();
-                mailbox.automation_save(0, None, draft()).is_ok()
+                mailbox
+                    .automation_save(0, None, draft())
+                    .err()
+                    .map(|error| error.to_string())
             })
         })
         .collect();
-    let successes = handles
+    let mut outcomes: Vec<_> = handles
         .into_iter()
         .map(|handle| handle.join().unwrap())
-        .filter(|ok| *ok)
-        .count();
-    assert_eq!(successes, 1);
+        .collect();
+    outcomes.sort();
+    assert_eq!(
+        outcomes,
+        vec![
+            None,
+            Some("automations changed; reload snapshot before retrying".into())
+        ]
+    );
     let snapshot = fixture.mailbox()?.automation_snapshot()?;
     assert_eq!(snapshot.revision, 1);
     assert_eq!(snapshot.definitions.len(), 1);
@@ -170,6 +198,10 @@ fn malformed_storage_and_obstructed_write_never_reset_state() -> Result<()> {
         ("/automations/schema", json!(2)),
         ("/automations/counter", json!(u64::MAX)),
         ("/automations/revision", json!(u64::MAX)),
+        (
+            "/automations/definitions/0/draft/workspace_id",
+            json!("folder-2"),
+        ),
         ("/automations/definitions/0/draft/path", json!("/tmp")),
         (
             "/automations/definitions/0/draft/schedule/host",
@@ -181,6 +213,10 @@ fn malformed_storage_and_obstructed_write_never_reset_state() -> Result<()> {
         state.pointer_mut(parent).unwrap()[field] = value;
         fixture.write(&state);
         let invalid = fixture.bytes();
+        if pointer != "/automations/revision" {
+            assert!(mailbox.automation_snapshot().is_err());
+            assert_eq!(fixture.bytes(), invalid);
+        }
         assert!(mailbox.automation_save(u64::MAX, None, draft()).is_err());
         assert_eq!(fixture.bytes(), invalid);
     }

@@ -22,6 +22,15 @@ pub struct AutomationDraft {
 }
 
 impl AutomationDraft {
+    fn validate_target(&self, projects: &[crate::sidebar::Project]) -> Result<()> {
+        if !projects.iter().any(|project| {
+            project.id == self.project_id && project.workspace_id == self.workspace_id
+        }) {
+            return Err(invalid("unknown automation project/workspace pair"));
+        }
+        Ok(())
+    }
+
     fn validate(&self) -> Result<()> {
         let Schedule::Interval {
             every_seconds,
@@ -76,7 +85,7 @@ impl Default for Catalog {
 }
 
 impl Catalog {
-    fn snapshot(&self) -> Result<AutomationSnapshot> {
+    fn snapshot(&self, projects: &[crate::sidebar::Project]) -> Result<AutomationSnapshot> {
         if self.schema != 1
             || self.definitions.len() > 128
             || self.counter != self.definitions.len() as u64
@@ -88,6 +97,7 @@ impl Catalog {
                 return Err(invalid("invalid stored automation ID"));
             }
             definition.draft.validate()?;
+            definition.draft.validate_target(projects)?;
         }
         Ok(AutomationSnapshot {
             revision: self.revision,
@@ -98,7 +108,7 @@ impl Catalog {
 
 impl Mailbox {
     pub fn automation_snapshot(&self) -> Result<AutomationSnapshot> {
-        self.transaction(|state| state.automations.snapshot())
+        self.transaction(|state| state.automations.snapshot(&state.sidebar.snapshot().projects))
     }
 
     pub fn automation_save(
@@ -108,19 +118,16 @@ impl Mailbox {
         mut draft: AutomationDraft,
     ) -> Result<AutomationSnapshot> {
         self.transaction(|state| {
+            let projects = state.sidebar.snapshot().projects;
             let catalog = &mut state.automations;
-            catalog.snapshot()?;
+            catalog.snapshot(&projects)?;
             if catalog.revision != expected_revision {
                 return Err(invalid(
                     "automations changed; reload snapshot before retrying",
                 ));
             }
             draft.validate()?;
-            if !state.sidebar.snapshot().projects.iter().any(|project| {
-                project.id == draft.project_id && project.workspace_id == draft.workspace_id
-            }) {
-                return Err(invalid("unknown automation project/workspace pair"));
-            }
+            draft.validate_target(&projects)?;
             draft.name = draft.name.trim().into();
             let revision = catalog
                 .revision
@@ -148,7 +155,7 @@ impl Mailbox {
                 catalog.counter = counter;
             }
             catalog.revision = revision;
-            catalog.snapshot()
+            catalog.snapshot(&projects)
         })
     }
 }
