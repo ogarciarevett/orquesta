@@ -16,23 +16,41 @@ const RECIPIENT: &str = "session:s";
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 enum DesktopRequest {
     Automations {},
-    SaveAutomation { revision: u64, id: Option<String>, draft: AutomationDraft },
+    SaveAutomation {
+        revision: u64,
+        id: Option<String>,
+        draft: AutomationDraft,
+    },
     AddProject {},
     Sidebar {},
-    SidebarPreference { revision: u64, patch: Preference },
+    SidebarPreference {
+        revision: u64,
+        patch: Preference,
+    },
     Inbox {},
     Read {},
     Reconnect {},
-    Ack { id: u64 },
+    Ack {
+        id: u64,
+    },
     Status {},
-    Visibility { key: String, visible: bool },
-    Display { mode: DisplayMode },
+    Visibility {
+        key: String,
+        visible: bool,
+    },
+    Display {
+        mode: DisplayMode,
+    },
     Refresh {},
 }
 fn dispatch(runtime: &Runtime, request: DesktopRequest) -> Result<Value, String> {
     let operation = match request {
         DesktopRequest::Automations {} => return sidebar_value(runtime.0.automation_snapshot()),
-        DesktopRequest::SaveAutomation { revision, id, draft } => {
+        DesktopRequest::SaveAutomation {
+            revision,
+            id,
+            draft,
+        } => {
             return sidebar_value(runtime.0.automation_save(revision, id, draft));
         }
         DesktopRequest::AddProject {} => return Err("Native picker required".into()),
@@ -113,10 +131,17 @@ fn local_url(url: &tauri::Url) -> bool {
 fn smoke_complete(app: tauri::AppHandle, success: bool, detail: String) {
     // Reopen the same app-data mailbox through core, without an OS app relaunch.
     let reopened = (|| -> Result<(), String> {
-        let directory = app.path().app_data_dir().map_err(|e| e.to_string())?.join("mailbox");
+        let directory = app
+            .path()
+            .app_data_dir()
+            .map_err(|e| e.to_string())?
+            .join("mailbox");
         let mailbox = Mailbox::open(directory).map_err(|e| e.to_string())?;
         let stored = sidebar_value(mailbox.automation_snapshot())?;
-        let current = dispatch(app.state::<Runtime>().inner(), DesktopRequest::Automations {})?;
+        let current = dispatch(
+            app.state::<Runtime>().inner(),
+            DesktopRequest::Automations {},
+        )?;
         if stored != current || stored["definitions"].as_array().is_none_or(Vec::is_empty) {
             return Err("Automation core reopen mismatch".into());
         }
@@ -259,7 +284,8 @@ mod tests {
                     .unwrap()
                     .as_nanos();
                 let root = std::env::temp_dir().join(format!(
-                    "native-draft-{}-{nonce}-{sequence}", std::process::id()
+                    "native-draft-{}-{nonce}-{sequence}",
+                    std::process::id()
                 ));
                 match std::fs::create_dir(&root) {
                     Ok(()) => return Self(root),
@@ -289,20 +315,40 @@ mod tests {
         let fixture = Fixture::new();
         let runtime = Runtime(Mailbox::open(&fixture.0).unwrap());
         runtime.0.register(RECIPIENT).unwrap();
-        runtime.0.send(orquesta_orchestration::Envelope {
-            request_id: "automation-unread".into(), from: RECIPIENT.into(),
-            to: RECIPIENT.into(), kind: "notice".into(), subject: "Keep".into(),
-            body: "Unread".into(), thread: None, metadata: Default::default(),
-        }).unwrap();
+        runtime
+            .0
+            .send(orquesta_orchestration::Envelope {
+                request_id: "automation-unread".into(),
+                from: RECIPIENT.into(),
+                to: RECIPIENT.into(),
+                kind: "notice".into(),
+                subject: "Keep".into(),
+                body: "Unread".into(),
+                thread: None,
+                metadata: Default::default(),
+            })
+            .unwrap();
         for name in ["first", "second"] {
             let folder = fixture.0.join(name);
             std::fs::create_dir(&folder).unwrap();
             runtime.0.sidebar_add_project(Some(folder)).unwrap();
         }
-        dispatch(&runtime, DesktopRequest::Display { mode: DisplayMode::Detailed }).unwrap();
-        runtime.0.sidebar_preference(2, Preference::Select {
-            workspace_id: "folder-1".into(),
-        }).unwrap();
+        dispatch(
+            &runtime,
+            DesktopRequest::Display {
+                mode: DisplayMode::Detailed,
+            },
+        )
+        .unwrap();
+        runtime
+            .0
+            .sidebar_preference(
+                2,
+                Preference::Select {
+                    workspace_id: "folder-1".into(),
+                },
+            )
+            .unwrap();
         let state = || -> Value {
             serde_json::from_slice(&std::fs::read(fixture.0.join("mailbox.json")).unwrap()).unwrap()
         };
@@ -314,21 +360,41 @@ mod tests {
         assert_eq!(saved["definitions"][0]["id"], "automation-1");
         assert_eq!(saved["definitions"][0]["draft"], request["draft"]);
         let reopened = Runtime(Mailbox::open(&fixture.0).unwrap());
-        assert_eq!(named(&reopened, json!({"kind":"automations"})).unwrap(), saved);
+        assert_eq!(
+            named(&reopened, json!({"kind":"automations"})).unwrap(),
+            saved
+        );
         let bytes = std::fs::read(fixture.0.join("mailbox.json")).unwrap();
-        assert_eq!(named(&runtime, request.clone()).unwrap_err(),
-            "automations changed; reload snapshot before retrying");
+        assert_eq!(
+            named(&runtime, request.clone()).unwrap_err(),
+            "automations changed; reload snapshot before retrying"
+        );
         for (pointer, value, error) in [
             ("/id", json!("automation-999"), "unknown automation ID"),
-            ("/draft/project_id", json!("foreign"), "unknown automation project/workspace pair"),
-            ("/draft/workspace_id", json!("folder-2"), "unknown automation project/workspace pair"),
-            ("/draft/prompt", json!("  "), "invalid automation draft; check name, prompt and interval limits"),
+            (
+                "/draft/project_id",
+                json!("foreign"),
+                "unknown automation project/workspace pair",
+            ),
+            (
+                "/draft/workspace_id",
+                json!("folder-2"),
+                "unknown automation project/workspace pair",
+            ),
+            (
+                "/draft/prompt",
+                json!("  "),
+                "invalid automation draft; check name, prompt and interval limits",
+            ),
         ] {
             let mut invalid = request.clone();
             invalid["revision"] = json!(1);
             *invalid.pointer_mut(pointer).unwrap() = value;
             assert_eq!(named(&runtime, invalid).unwrap_err(), error);
-            assert_eq!(std::fs::read(fixture.0.join("mailbox.json")).unwrap(), bytes);
+            assert_eq!(
+                std::fs::read(fixture.0.join("mailbox.json")).unwrap(),
+                bytes
+            );
         }
         std::fs::create_dir(fixture.0.join("mailbox.pending")).unwrap();
         let mut replacement = request.clone();
@@ -336,9 +402,15 @@ mod tests {
         replacement["id"] = json!("automation-1");
         replacement["draft"]["prompt"] = json!("Replacement");
         assert!(named(&runtime, replacement.clone()).is_err());
-        assert_eq!(std::fs::read(fixture.0.join("mailbox.json")).unwrap(), bytes);
+        assert_eq!(
+            std::fs::read(fixture.0.join("mailbox.json")).unwrap(),
+            bytes
+        );
         std::fs::remove_dir(fixture.0.join("mailbox.pending")).unwrap();
-        assert_eq!(named(&reopened, json!({"kind":"automations"})).unwrap(), saved);
+        assert_eq!(
+            named(&reopened, json!({"kind":"automations"})).unwrap(),
+            saved
+        );
         let updated = named(&runtime, replacement).unwrap();
         assert_eq!(updated["revision"], 2);
         assert_eq!(updated["definitions"][0]["id"], "automation-1");
@@ -346,37 +418,94 @@ mod tests {
         let mut after = state();
         after.as_object_mut().unwrap().remove("automations");
         assert_eq!(after, unrelated);
-        assert_eq!(dispatch(&runtime, DesktopRequest::Inbox {}).unwrap()[0]["read"], false);
+        assert_eq!(
+            dispatch(&runtime, DesktopRequest::Inbox {}).unwrap()[0]["read"],
+            false
+        );
     }
     #[test]
     fn automation_requests_reject_unknown_and_invalid_shapes() {
         let request = save_request();
-        for field in ["run", "enable", "delete", "recipient", "path", "cwd", "process",
-            "executable", "provider", "env", "host", "session", "precheck", "args", "status"] {
+        for field in [
+            "run",
+            "enable",
+            "delete",
+            "recipient",
+            "path",
+            "cwd",
+            "process",
+            "executable",
+            "provider",
+            "env",
+            "host",
+            "session",
+            "precheck",
+            "args",
+            "status",
+        ] {
             for pointer in ["", "/draft", "/draft/schedule"] {
                 let mut invalid = request.clone();
                 invalid.pointer_mut(pointer).unwrap()[field] = json!("forbidden");
-                assert!(serde_json::from_value::<DesktopRequest>(invalid).is_err(), "{pointer}/{field}");
+                assert!(
+                    serde_json::from_value::<DesktopRequest>(invalid).is_err(),
+                    "{pointer}/{field}"
+                );
             }
-            assert!(serde_json::from_value::<DesktopRequest>(json!({"kind":"automations",(field):true})).is_err());
+            assert!(
+                serde_json::from_value::<DesktopRequest>(
+                    json!({"kind":"automations",(field):true})
+                )
+                .is_err()
+            );
         }
-        for kind in ["run", "enable", "delete", "automation_run", "automation_enable", "automation_delete"] {
+        for kind in [
+            "run",
+            "enable",
+            "delete",
+            "automation_run",
+            "automation_enable",
+            "automation_delete",
+        ] {
             assert!(serde_json::from_value::<DesktopRequest>(json!({"kind":kind})).is_err());
         }
-        for pointer in ["/revision", "/draft", "/draft/name", "/draft/prompt",
-            "/draft/project_id", "/draft/workspace_id", "/draft/schedule",
-            "/draft/schedule/kind", "/draft/schedule/every_seconds", "/draft/schedule/anchor_utc_seconds"] {
+        for pointer in [
+            "/revision",
+            "/draft",
+            "/draft/name",
+            "/draft/prompt",
+            "/draft/project_id",
+            "/draft/workspace_id",
+            "/draft/schedule",
+            "/draft/schedule/kind",
+            "/draft/schedule/every_seconds",
+            "/draft/schedule/anchor_utc_seconds",
+        ] {
             let mut missing = request.clone();
             let (parent, key) = pointer.rsplit_once('/').unwrap();
-            missing.pointer_mut(parent).unwrap().as_object_mut().unwrap().remove(key);
-            assert!(serde_json::from_value::<DesktopRequest>(missing).is_err(), "{pointer}");
+            missing
+                .pointer_mut(parent)
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .remove(key);
+            assert!(
+                serde_json::from_value::<DesktopRequest>(missing).is_err(),
+                "{pointer}"
+            );
         }
-        for (pointer, value) in [("/revision", json!(-1)), ("/id", json!(4)),
-            ("/draft/name", json!(false)), ("/draft/schedule/kind", json!("cron")),
-            ("/draft/schedule/every_seconds", json!("60"))] {
+        for (pointer, value) in [
+            ("/revision", json!(-1)),
+            ("/id", json!(4)),
+            ("/draft/name", json!(false)),
+            ("/draft/schedule/kind", json!("cron")),
+            ("/draft/schedule/every_seconds", json!("60")),
+        ] {
             let mut invalid = request.clone();
             *invalid.pointer_mut(pointer).unwrap() = value;
-            assert!(serde_json::from_value::<DesktopRequest>(invalid).is_err(), "{pointer}");
+            assert!(
+                serde_json::from_value::<DesktopRequest>(invalid).is_err(),
+                "{pointer}"
+            );
         }
     }
     #[test]
