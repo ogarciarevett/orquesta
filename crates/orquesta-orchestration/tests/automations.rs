@@ -217,7 +217,8 @@ fn malformed_storage_and_obstructed_write_never_reset_state() -> Result<()> {
             assert!(mailbox.automation_snapshot().is_err());
             assert_eq!(fixture.bytes(), invalid);
         }
-        assert!(mailbox.automation_save(u64::MAX, None, draft()).is_err());
+        let revision = state["automations"]["revision"].as_u64().unwrap();
+        assert!(mailbox.automation_save(revision, None, draft()).is_err());
         assert_eq!(fixture.bytes(), invalid);
     }
     fs::write(fixture.0.join("mailbox.json"), "corrupt")?;
