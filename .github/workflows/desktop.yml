@@ -13,29 +13,30 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.99.1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
       - name: Record hosted architecture and resolve lock
         run: |
           mkdir -p evidence
-          rustfmt --edition 2024 --emit stdout src/main.rs > evidence/main.rs
-          rustfmt --edition 2024 --emit stdout build.rs > evidence/build.rs
+          cargo fmt --all --check
           uname -m | tee evidence/architecture.txt
           test "$(uname -m)" = arm64
           rustc -Vv > evidence/toolchain.txt
           git rev-parse HEAD > evidence/head.txt
-          if test ! -f Cargo.lock; then cargo generate-lockfile; fi
+          npx --yes @tauri-apps/cli@2.12.4 --version > evidence/cli-version.txt
+          test -f Cargo.lock
           cp Cargo.lock evidence/Cargo.lock
           wc -l Cargo.lock > evidence/lock-count.txt
           cargo metadata --locked --format-version 1 > evidence/dependencies.json
           cargo fetch --locked --target aarch64-apple-darwin
-      - run: npx --yes @tauri-apps/cli@2 icon icon.svg
+      - run: npx --yes @tauri-apps/cli@2.12.4 icon icon.svg
       - name: Test native boundary offline
         run: cargo test --locked --offline
+      - run: cargo clippy --locked --offline --all-targets -- -D warnings
       - name: Build internal ad hoc app
-        run: npx --yes @tauri-apps/cli@2 build --target aarch64-apple-darwin --bundles app -- --locked --offline
+        run: npx --yes @tauri-apps/cli@2.12.4 build --target aarch64-apple-darwin --bundles app -- --locked --offline
       - name: Preserve and inspect app
         run: |
           codesign --verify --deep --strict target/aarch64-apple-darwin/release/bundle/macos/Orquesta.app
@@ -45,10 +46,13 @@ jobs:
           shasum -a 256 evidence/Orquesta.app.zip > evidence/SHA256SUMS
       - name: Build and run isolated WebView smoke
         run: |
-          npx --yes @tauri-apps/cli@2 build --target aarch64-apple-darwin --no-bundle --features native-smoke --config smoke.conf.json -- --locked --offline
+          npx --yes @tauri-apps/cli@2.12.4 build --target aarch64-apple-darwin --no-bundle --features native-smoke --config smoke.conf.json -- --locked --offline
           target/aarch64-apple-darwin/release/orquesta-desktop > evidence/smoke.log 2>&1 &
           smoke_pid=$!
           for attempt in $(seq 1 60); do
+            if grep -q NATIVE_WINDOW_LOADED evidence/smoke.log && test ! -f evidence/native-window.png; then
+              screencapture -x evidence/native-window.png
+            fi
             if test -f smoke-result.json; then break; fi
             sleep 1
           done

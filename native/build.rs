@@ -6,9 +6,8 @@ fn main() {
         &["desktop_request"]
     };
     tauri_build::try_build(
-        tauri_build::Attributes::new().app_manifest(
-            tauri_build::AppManifest::new().commands(commands),
-        ),
+        tauri_build::Attributes::new()
+            .app_manifest(tauri_build::AppManifest::new().commands(commands)),
     )
     .expect("desktop permission manifest");
 }
