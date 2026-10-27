@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/orquesta-orchestration"]
+resolver = "2"
