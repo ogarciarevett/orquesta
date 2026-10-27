@@ -38,7 +38,50 @@
     if (!chosen.projects.some(project => project.label === 'orquesta-picked-folder' && project.kind === 'folder')) throw new Error('Native selected folder missing');
     const restart = await call({ kind: 'sidebar' });
     if (JSON.stringify(chosen) !== JSON.stringify(restart)) throw new Error('Native catalog not persisted');
-    await invoke('smoke_complete', { success: true, detail: 'WKWebView invoke, native picker cancel/selection, persistence, rejection and draft checks passed; no live mail delivery or PTY proof.' });
+    // Use the picker-produced catalog pair through the public named adapter.
+    draft.focus(); draft.setSelectionRange(3, 14, 'backward');
+    const composer = [draft.value, draft.selectionStart, draft.selectionEnd, draft.selectionDirection, document.activeElement];
+    const unread = await window.orquestaNative('inbox');
+    const initial = await window.orquestaNative('automations');
+    const project = chosen.projects.find(project => project.label === 'orquesta-picked-folder');
+    const definition = {
+      name: 'Native review', prompt: ' \nReview λ\n  keep indentation\n',
+      project_id: project.id, workspace_id: project.workspace_id,
+      schedule: { kind: 'interval', every_seconds: 60, anchor_utc_seconds: 0 }
+    };
+    const fields = { revision: initial.revision, id: null, draft: definition };
+    // Unknown top-level adapter input is omitted; the typed request remains narrow.
+    const saved = await window.orquestaNative('save-automation', { ...fields, recipient: 'session:other', path: '/tmp' });
+    if (saved.revision !== initial.revision + 1 || saved.definitions.length !== initial.definitions.length + 1) throw new Error('Native save failed');
+    const record = saved.definitions.at(-1);
+    if (!/^automation-\d+$/.test(record.id) || JSON.stringify(record.draft) !== JSON.stringify(definition)) throw new Error('Draft round trip differs');
+    const persistedDrafts = await window.orquestaNative('automations');
+    if (JSON.stringify(saved) !== JSON.stringify(persistedDrafts)) throw new Error('Native draft read differs');
+    const reject = async (action, expected) => {
+      try { await action(); } catch (error) {
+        if (!(error instanceof Error) || expected && error.message !== expected) throw error;
+        return;
+      }
+      throw new Error('Automation authority accepted');
+    };
+    await reject(() => window.orquestaNative('save-automation', fields), 'automations changed; reload snapshot before retrying');
+    await reject(() => window.orquestaNative('save-automation', { revision: saved.revision, id: 'automation-999999', draft: definition }), 'unknown automation ID');
+    await reject(() => window.orquestaNative('save-automation', { revision: saved.revision, id: null, draft: { ...definition, project_id: 'foreign' } }), 'unknown automation project/workspace pair');
+    await reject(() => window.orquestaNative('save-automation', { revision: saved.revision, id: null, draft: { ...definition, env: {} } }));
+    for (const kind of ['run', 'enable', 'delete']) await reject(() => window.orquestaNative(kind));
+    for (const request of [
+      { kind: 'automations', recipient: 'session:other' },
+      { kind: 'save_automation', revision: saved.revision, id: null, draft: definition, cwd: '/tmp' },
+      { kind: 'save_automation', revision: saved.revision, id: null, draft: { ...definition, schedule: { ...definition.schedule, kind: 'cron' } } }
+    ]) {
+      let rejected = false;
+      try { await call(request); } catch { rejected = true; }
+      if (!rejected) throw new Error('Raw automation request accepted');
+    }
+    if (JSON.stringify(await window.orquestaNative('automations')) !== JSON.stringify(saved) || JSON.stringify(await window.orquestaNative('inbox')) !== JSON.stringify(unread)) throw new Error('Rejected save changed drafts or unread mail');
+    const composerAfter = [draft.value, draft.selectionStart, draft.selectionEnd, draft.selectionDirection, document.activeElement];
+    if (draft !== document.querySelector('#draft') || composer.some((value, index) => value !== composerAfter[index]) || !submit.disabled || document.querySelector('#submissions').value !== '0') throw new Error('Automation calls changed composer');
+    await invoke('smoke_complete', { success: true, detail: 'WKWebView named adapter -> Tauri -> Rust save/read with real picker IDs, CAS/authority rejection and composer/unread checks passed; same-mailbox core reopen verifies persistence, not OS app relaunch; no scheduling or execution proof.' });
   } catch (error) {
     await invoke('smoke_complete', { success: false, detail: String(error) });
   }
