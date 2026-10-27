@@ -50,7 +50,7 @@ class FocusUI(unittest.TestCase):
             sent: document.querySelector('#submissions').value, focusLosses: window.focusLosses};
         })()""")
 
-    def test_composer_survives_polls_and_both_resize_directions(self):
+    def prepare_draft(self):
         browser('fill', '#draft', 'first line\nsecond λ line\nlast line')
         evaluate("window.focusDraft = document.querySelector('#draft'); window.focusDraft.setSelectionRange(4, 22, 'backward')")
         evaluate("window.focusLosses = 0; window.focusDraft.addEventListener('blur', () => window.focusLosses++)")
@@ -58,6 +58,10 @@ class FocusUI(unittest.TestCase):
         self.assertEqual(before['focus'], 'draft')
         self.assertEqual(before['sent'], '0')
         self.assertEqual((before['start'], before['end'], before['direction']), (4, 22, 'backward'))
+        return before
+
+    def test_composer_survives_polls_and_both_resize_directions(self):
+        before = self.prepare_draft()
         for count, width in enumerate([699, 701, 375, 1280], 1):
             with self.subTest(width=width):
                 browser('focus', '#draft')
@@ -88,6 +92,26 @@ class FocusUI(unittest.TestCase):
             expected = dict(before, focus='inbox-toggle', focusLosses=1)
             self.assertEqual(self.draft_state(), expected)
             self.assertEqual(evaluate("document.querySelector('#inbox-toggle').getAttribute('aria-expanded')"), 'false')
+
+    def test_hidden_inbox_controls_return_focus_to_visible_trigger(self):
+        ipc(dict(command='send', envelope=dict(request_id='hidden-target', to='session:s',
+            **{'from': 'run:r'}, kind='status', subject='Focusable notice', body='Inbox target', thread=None)))
+        browser('wait', '--fn', "document.querySelectorAll('.message').length === 1")
+        before = self.prepare_draft()
+        for count, selector in enumerate(['#inbox-close', '#messages .message'], 1):
+            with self.subTest(selector=selector):
+                browser('set', 'viewport', '1280', '900')
+                browser('wait', '--fn', "document.querySelector('#inbox').open")
+                browser('focus', selector)
+                self.assertTrue(evaluate(f"document.activeElement === document.querySelector('{selector}')"))
+                browser('set', 'viewport', '375', '900')
+                browser('wait', '--fn', "!document.querySelector('#inbox').open && document.activeElement.id === 'inbox-toggle'")
+                ipc(dict(command='status-bar', action=dict(action='inventory', kind='terminals', id=f'hidden-{count}', present=True)))
+                browser('wait', '--fn', f"document.querySelector('#sb-terminals').ariaLabel === '{count} terminals'")
+                self.assertEqual(evaluate("document.querySelector('#inbox-toggle').getAttribute('aria-expanded')"), 'false')
+                self.assertEqual(self.draft_state(), dict(before, focus='inbox-toggle', focusLosses=1))
+                browser('screenshot', str(SHOTS / f'focus-hidden-{count}.png'))
+                print(f'{selector}: hidden panel returned focus after successful poll', flush=True)
 
     def test_checkbox_space_persists_across_successful_menu_and_settings_polls(self):
         for surface in ['sb-menu', 'sb-settings']:

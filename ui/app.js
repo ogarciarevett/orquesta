@@ -29,7 +29,7 @@ function closeInbox(returnFocus) {
 }
 function layout() {
   const focused = document.activeElement;
-  closeInbox(false);
+  closeInbox(inbox.contains(focused));
   if (!mobile.matches) inbox.open = true;
   element('inbox-toggle').setAttribute('aria-expanded', String(inbox.open));
   if (focused === element('draft') && document.activeElement !== focused) focused.focus({ preventScroll: true });
@@ -42,7 +42,8 @@ inbox.oncancel = event => { event.preventDefault(); closeInbox(true); };
 inbox.onclose = () => {
   const returnFocus = closeReturns.shift() ?? true;
   element('inbox-toggle').setAttribute('aria-expanded', String(inbox.open));
-  if (returnFocus && !inbox.open) element('inbox-toggle').focus();
+  const focused = document.activeElement;
+  if (returnFocus && !inbox.open && (!focused || focused === document.body || inbox.contains(focused))) element('inbox-toggle').focus();
 };
 document.querySelectorAll('a[href="#settingsdialog"]').forEach(link => { link.onclick = event => { event.preventDefault(); settings.showModal(); }; });
 element('settings-close').onclick = () => settings.close();
