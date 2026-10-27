@@ -26,6 +26,7 @@ fn durable_fifo_dedup_reply_and_human_draft() -> Result<()> {
         subject: "Ready?".into(),
         body: "Review this".into(),
         thread: None,
+        metadata: Default::default(),
     };
     let first = mailbox.send(envelope.clone())?;
     assert_eq!(mailbox.send(envelope.clone())?, first);
@@ -96,6 +97,7 @@ fn concurrent_retries_are_one_durable_message() -> Result<()> {
                         subject: "Concurrent".into(),
                         body: String::new(),
                         thread: None,
+                        metadata: Default::default(),
                     })
                     .unwrap()
                     .id
