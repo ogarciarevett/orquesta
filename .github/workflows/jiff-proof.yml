@@ -17,7 +17,6 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: ${{ runner.temp }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,6 +25,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.99.1
       - name: Prepare isolated baseline and candidate
         run: |
+          cd "$RUNNER_TEMP"
           mkdir evidence baseline candidate
           git -C "$GITHUB_WORKSPACE" archive aada0c6d6c7c3eae269ce3097a1ee9ef4fad4cbd | tar -x -C baseline
           git -C "$GITHUB_WORKSPACE" archive aada0c6d6c7c3eae269ce3097a1ee9ef4fad4cbd | tar -x -C candidate
@@ -45,6 +45,7 @@ jobs:
           PY
       - name: Resolve both workspaces conservatively and record target feature closure
         run: |
+          cd "$RUNNER_TEMP"
           host=$(rustc +1.99.1 -vV | sed -n 's/^host: //p')
           for variant in baseline candidate; do
             for workspace in root native; do
@@ -69,6 +70,7 @@ jobs:
       - name: Enumerate generated changes, package identities, licenses and declared MSRV
         if: always()
         run: |
+          cd "$RUNNER_TEMP"
           python3 - <<'PY'
           import difflib, hashlib, json, shutil, tomllib
           from pathlib import Path
@@ -125,6 +127,7 @@ jobs:
           PY
       - name: Core Rust 1.89 compatibility and identical-flags size probe
         run: |
+          cd "$RUNNER_TEMP"
           for variant in baseline candidate; do
             cargo +1.89.0 test --manifest-path "$variant/Cargo.toml" --workspace --locked --offline > "evidence/$variant/core-test-1.89.txt" 2>&1
           done
@@ -155,6 +158,7 @@ jobs:
       - name: Native Rust 1.89 diagnostic (failure is evidence, not compatibility)
         if: runner.os == 'macOS'
         run: |
+          cd "$RUNNER_TEMP"
           for variant in baseline candidate; do
             set +e
             cargo +1.89.0 check --manifest-path "$variant/native/Cargo.toml" --locked --offline > "evidence/$variant/native-check-1.89.txt" 2>&1
@@ -169,6 +173,7 @@ jobs:
       - name: Native baseline and dependency-only candidate size (same flags, no new API)
         if: runner.os == 'macOS'
         run: |
+          cd "$RUNNER_TEMP"
           for variant in baseline candidate; do
             (cd "$variant/native" && npx --yes @tauri-apps/cli@2.12.4 icon icon.svg)
             cargo +1.99.1 build --manifest-path "$variant/native/Cargo.toml" --release --locked --offline > "evidence/$variant/native-build.txt" 2>&1
