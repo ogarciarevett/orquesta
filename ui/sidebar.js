@@ -5,7 +5,10 @@
   const narrow = matchMedia('(max-width: 920px)');
   let snapshot, busy = false;
   function sheet(open, restore = false) {
+    if (panel.open) panel.close();
     panel.hidden = narrow.matches && !open;
+    if (narrow.matches && open) panel.showModal();
+    else if (!narrow.matches) panel.open = true;
     toggle.setAttribute('aria-expanded', String(!panel.hidden));
     if (restore) toggle.focus();
   }
@@ -15,9 +18,7 @@
   }
   toggle.onclick = () => { sheet(panel.hidden); if (!panel.hidden) get('add-project').focus(); };
   get('projects-close').onclick = () => sheet(false, true);
-  panel.onkeydown = event => {
-    if (event.key === 'Escape' && narrow.matches) { event.preventDefault(); sheet(false, true); }
-  };
+  panel.oncancel = event => { event.preventDefault(); sheet(false, true); };
   narrow.onchange = layout;
   layout();
   function button(label, id, action) {
@@ -69,7 +70,7 @@
   }
   async function request(command, fields) {
     if (busy) return;
-    busy = true; get('add-project').disabled = true; get('projects-retry').hidden = true;
+    busy = true; get('add-project').setAttribute('aria-disabled', 'true'); get('projects-retry').hidden = true;
     try {
       if (!window.orquestaNative) throw new Error('Open the desktop app to add local projects.');
       const next = await window.orquestaNative(command, fields);
@@ -77,7 +78,7 @@
       if (command === 'sidebar-preference' && fields.patch.action === 'select' && narrow.matches) sheet(false, true);
     } catch (error) {
       get('project-status').textContent = error.message; get('projects-retry').hidden = false;
-    } finally { busy = false; get('add-project').disabled = !window.orquestaNative; }
+    } finally { busy = false; get('add-project').setAttribute('aria-disabled', String(!window.orquestaNative)); }
   }
   const preference = patch => request('sidebar-preference', { revision: snapshot.revision, patch });
   get('add-project').onclick = () => request('add-project');

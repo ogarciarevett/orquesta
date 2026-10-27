@@ -30,7 +30,10 @@
     const after = [draft.value, draft.selectionStart, draft.selectionEnd, draft.selectionDirection, document.activeElement];
     if (draft !== document.querySelector('#draft') || before.some((value, index) => value !== after[index]) || document.querySelector('#submissions').value !== '0') throw new Error('Draft changed');
     const pick = () => Promise.race([call({ kind: 'add_project' }), new Promise((_, reject) => setTimeout(() => reject(new Error('Native picker automation timed out; inspect picker-driver.log')), 20000))]);
-    if (await pick() !== null) throw new Error('Cancel changed catalog');
+    const catalogBefore = await call({ kind: 'sidebar' }), add = document.querySelector('#add-project');
+    add.focus(); add.click();
+    for (let attempt = 0; add.getAttribute('aria-disabled') !== 'false' && attempt < 200; attempt++) await new Promise(resolve => setTimeout(resolve, 100));
+    if (document.activeElement !== add || JSON.stringify(catalogBefore) !== JSON.stringify(await call({ kind: 'sidebar' }))) throw new Error('Picker cancellation changed focus or catalog');
     const chosen = await pick();
     if (!chosen.projects.some(project => project.label === 'orquesta-picked-folder' && project.kind === 'folder')) throw new Error('Native selected folder missing');
     const restart = await call({ kind: 'sidebar' });

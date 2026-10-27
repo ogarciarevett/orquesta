@@ -25,6 +25,7 @@ class SidebarUI(unittest.TestCase):
           window.sidebarRequests = [];
           window.orquestaNative = async (command, fields) => {
             window.sidebarRequests.push({command, fields});
+            if (command === 'add-project') return new Promise(resolve => { window.cancelPicker = resolve; });
             if (!['sidebar', 'sidebar-preference'].includes(command)) {
               const operation = command === 'status-bar' ? {command, action: fields} : {command, recipient: 'session:s', ...fields};
               return (await (await fetch('/ipc', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({version: 1, operation})})).json()).result;
@@ -40,6 +41,11 @@ class SidebarUI(unittest.TestCase):
           document.querySelector('#projects-retry').click();""")
         browser('wait', '--fn', "!!document.querySelector('[data-id=folder-9]')")
         self.assertEqual(self.draft_state(), before)
+        browser('click', '#add-project')
+        self.assertEqual(evaluate('document.activeElement.id'), 'add-project')
+        evaluate('window.cancelPicker(null)')
+        browser('wait', '--fn', "document.querySelector('#add-project').getAttribute('aria-disabled') === 'false'")
+        self.assertEqual(evaluate('document.activeElement.id'), 'add-project')
         self.assertGreaterEqual(evaluate("document.querySelector('.terminal').getBoundingClientRect().width"), 640)
         browser('click', '[data-id=folder-9]')
         browser('wait', '--fn', "document.querySelector('[data-id=folder-9]').getAttribute('aria-current') === 'true'")
@@ -52,6 +58,11 @@ class SidebarUI(unittest.TestCase):
             browser('set', 'viewport', str(width), '900')
             if width == 375:
                 browser('click', '#projects-toggle')
+                self.assertTrue(evaluate("document.querySelector('#projects').matches(':modal')"))
+                for _ in range(8):
+                    browser('press', 'Tab')
+                    self.assertTrue(evaluate("document.querySelector('#projects').contains(document.activeElement)"))
+                self.assertEqual(evaluate("document.querySelector('#projects').getBoundingClientRect().bottom"), evaluate("document.querySelector('#status-bar').getBoundingClientRect().top"))
             for theme in ['light', 'dark']:
                 evaluate(f"document.documentElement.dataset.theme = '{theme}'")
                 self.assertTrue(evaluate('document.documentElement.scrollWidth <= innerWidth'))
