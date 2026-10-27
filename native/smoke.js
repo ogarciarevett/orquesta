@@ -23,7 +23,7 @@
       }
       if (!rejected) throw new Error('Authority or unavailable operation accepted');
     }
-    document.querySelector('#composer button[type=submit]').scrollIntoView({ block: 'end' });
+    document.querySelector('#composer button[type=submit]').scrollIntoView({ block: 'center' });
     await new Promise(resolve => setTimeout(resolve, 2200));
     const after = [draft.value, draft.selectionStart, draft.selectionEnd, draft.selectionDirection, document.activeElement];
     if (draft !== document.querySelector('#draft') || before.some((value, index) => value !== after[index]) || document.querySelector('#submissions').value !== '0') throw new Error('Draft changed');
