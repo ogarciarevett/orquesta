@@ -1,3 +1,4 @@
 [workspace]
 members = ["crates/orquesta-orchestration"]
+exclude = ["native"]
 resolver = "2"

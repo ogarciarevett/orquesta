@@ -17,6 +17,7 @@
   const providers = new Map(), roster = new Map(), controls = new Map(), previous = new Map(), busy = new Set();
   let state, polling = false;
   async function request(action) {
+    if (window.orquestaNative) return window.orquestaNative('status-bar', action);
     const response = await fetch('/ipc', { signal: AbortSignal.timeout(10000), method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: 1, operation: { command: 'status-bar', action } }) });
     const body = await response.json();
     if (!response.ok || body.error) throw new Error(body.error?.message || 'Status unavailable');

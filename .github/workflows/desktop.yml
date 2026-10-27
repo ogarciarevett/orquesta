@@ -1,0 +1,68 @@
+name: Desktop
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  macos-app:
+    runs-on: macos-15
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: native
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - run: rustup component add --toolchain 1.99.1 rustfmt clippy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Record hosted architecture and resolve lock
+        run: |
+          mkdir -p evidence
+          cargo fmt --all --check
+          uname -m | tee evidence/architecture.txt
+          test "$(uname -m)" = arm64
+          rustc -Vv > evidence/toolchain.txt
+          git rev-parse HEAD > evidence/head.txt
+          npx --yes @tauri-apps/cli@2.12.4 --version > evidence/cli-version.txt
+          test -f Cargo.lock
+          cp Cargo.lock evidence/Cargo.lock
+          wc -l Cargo.lock > evidence/lock-count.txt
+          cargo metadata --locked --format-version 1 > evidence/dependencies.json
+          cargo fetch --locked --target aarch64-apple-darwin
+      - run: npx --yes @tauri-apps/cli@2.12.4 icon icon.svg
+      - name: Test native boundary offline
+        run: cargo test --locked --offline
+      - run: cargo clippy --locked --offline --all-targets -- -D warnings
+      - name: Build internal ad hoc app
+        run: npx --yes @tauri-apps/cli@2.12.4 build --target aarch64-apple-darwin --bundles app -- --locked --offline
+      - name: Preserve and inspect app
+        run: |
+          codesign --verify --deep --strict target/aarch64-apple-darwin/release/bundle/macos/Orquesta.app
+          file target/aarch64-apple-darwin/release/bundle/macos/Orquesta.app/Contents/MacOS/orquesta-desktop > evidence/binary.txt
+          plutil -p target/aarch64-apple-darwin/release/bundle/macos/Orquesta.app/Contents/Info.plist > evidence/bundle.txt
+          ditto -c -k --sequesterRsrc --keepParent target/aarch64-apple-darwin/release/bundle/macos/Orquesta.app evidence/Orquesta.app.zip
+          shasum -a 256 evidence/Orquesta.app.zip > evidence/SHA256SUMS
+      - name: Build and run isolated WebView smoke
+        run: |
+          npx --yes @tauri-apps/cli@2.12.4 build --target aarch64-apple-darwin --no-bundle --features native-smoke --config smoke.conf.json -- --locked --offline
+          target/aarch64-apple-darwin/release/orquesta-desktop > evidence/smoke.log 2>&1 &
+          smoke_pid=$!
+          for attempt in $(seq 1 60); do
+            if grep -q NATIVE_WINDOW_LOADED evidence/smoke.log && test ! -f evidence/native-window.png; then
+              screencapture -x evidence/native-window.png
+            fi
+            if test -f smoke-result.json; then break; fi
+            sleep 1
+          done
+          kill "$smoke_pid" 2>/dev/null || true
+          test -f smoke-result.json
+          cp smoke-result.json evidence/
+          python3 -c 'import json; assert json.load(open("smoke-result.json"))["success"]'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: orquesta-macos-internal-${{ github.event.pull_request.head.sha || github.sha }}
+          path: native/evidence/

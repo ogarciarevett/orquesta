@@ -1,0 +1,17 @@
+{
+  "productName": "Orquesta",
+  "version": "0.1.0",
+  "identifier": "dev.orquesta.desktop",
+  "build": {
+    "frontendDist": ["../ui/index.html", "../ui/style.css", "../ui/app.js", "../ui/status-bar.css", "../ui/status-bar.js", "../ui/native.js"]
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": {
+      "capabilities": ["main"],
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'"
+    }
+  },
+  "bundle": { "active": true, "targets": ["app"], "icon": ["icons/icon.icns"], "macOS": { "minimumSystemVersion": "13.0", "signingIdentity": "-" } }
+}

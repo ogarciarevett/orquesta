@@ -28,3 +28,9 @@ registers run:r and session:s in ORQUESTA_MAILBOX_DIR (default target/inbox-ui).
 Mail stays in Rust storage; notification and theme preferences stay in this
 browser. Draft protection is always on. Submission is a local counter only.
 Run `python3 ui/test_ui.py` for browser verification (Node.js is required).
+
+### Internal desktop preview
+
+The native workspace packages the static terminal draft, durable inbox, and status bar in Tauri v2. It invokes the Rust runtime directly, stores its fixed session mailbox under the application data directory, and keeps unavailable usage and inventories explicit. The Python host remains development only. Draft submission is disabled in the native preview because a PTY is not connected.
+
+The Desktop workflow produces an Apple Silicon app ZIP with an ad hoc signature, SHA256, source revision, toolchain, dependency lock, and WebView smoke report. This internal artifact is not notarized. A draft without its tracked generated lock is a dependency-sizing candidate, not a reproducible release. Script CSP stays enabled; style attributes are allowed only for the existing usage meter widths. Production assets are explicitly allowlisted; reference fixtures, development hosts, and smoke scripts are excluded. No shell, filesystem, HTTP, updater, or remote-origin permissions are granted to the webview.
