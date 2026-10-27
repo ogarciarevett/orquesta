@@ -14,6 +14,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: dtolnay/rust-toolchain@1.99.1
+      - run: rustup component add --toolchain 1.99.1 rustfmt clippy
       - uses: actions/setup-node@v4
         with:
           node-version: 24
