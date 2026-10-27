@@ -1,0 +1,48 @@
+<!doctype html>
+<!-- Copyright (c) 2026 Lovecast Inc. SPDX-License-Identifier: MIT -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Orquesta · Terminal and inbox</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="masthead">
+    <a class="brand" href="/">Orquesta<span>Work in concert.</span></a>
+    <nav aria-label="Workspace controls">
+      <button id="theme" type="button">Theme</button>
+      <button id="inbox-toggle" type="button" aria-controls="inbox" aria-expanded="true">Inbox <span id="badge">0</span></button>
+    </nav>
+  </header>
+  <div class="workspace" role="region" aria-label="Workspace status"><span>LOCAL WORKSPACE</span><span id="status" role="status">Connecting to mailbox…</span></div>
+  <main>
+    <section class="terminal" aria-labelledby="terminal-title">
+      <div class="section-heading"><div><p class="eyebrow">YOUR INPUT</p><h1 id="terminal-title">Room to think.</h1></div><span class="protected">Draft protected</span></div>
+      <p class="intro">Write at your own pace. Incoming messages stay in your inbox.</p>
+      <form id="composer">
+        <label for="draft">Human-owned terminal composer</label>
+        <textarea id="draft" name="draft" rows="10" spellcheck="false" placeholder="Start a multi-line draft…" aria-describedby="draft-help"></textarea>
+        <p id="draft-help">Only you can submit this draft. Inbox actions never send terminal input.</p>
+        <footer><span>Submitted drafts: <output id="submissions">0</output></span><button class="primary" type="submit">Submit draft</button></footer>
+      </form>
+      <details id="settings">
+        <summary>Settings</summary>
+        <label class="setting"><input id="safety" type="checkbox" checked> Inbox safety notifications</label>
+        <p>Show a separate notice when mail arrives. Draft protection is always on.</p>
+      </details>
+    </section>
+    <aside id="inbox" aria-labelledby="inbox-title">
+      <div class="section-heading"><div><p class="eyebrow">SESSION:S</p><h2 id="inbox-title">Orchestration inbox</h2></div><span class="inbox-mark" aria-hidden="true">↙</span></div>
+      <p class="intro">Durable messages, in arrival order.</p>
+      <div class="inbox-tools"><button id="read-batch" type="button">Read batch</button><button id="connection" type="button">Disconnect</button></div>
+      <p id="notice" role="status" aria-live="polite">Loading inbox…</p>
+      <ol id="messages" aria-label="Inbox messages"></ol>
+      <p class="inbox-foot">Unacknowledged mail replays after reconnect. Acknowledged items stay in history.</p>
+    </aside>
+  </main>
+  <footer class="page-foot">Your draft stays yours. Your inbox keeps the rest.</footer>
+</body>
+</html>
