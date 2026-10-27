@@ -17,6 +17,32 @@ def luminance(color):
     return sum(weight * (value / 3294.6 if value <= 10.31475 else ((value / 255 + .055) / 1.055) ** 2.4) for weight, value in zip((.2126, .7152, .0722), values))
 
 
+
+def verify_checkbox_poll_focus(test, browser, evaluate, ipc, selector):
+    rpc = lambda action: ipc(dict(command='status-bar', action=action))['result']
+    browser('focus', selector)
+    evaluate(f"window.focusControl = document.querySelector({json.dumps(selector)})")
+    initial = evaluate('window.focusControl.checked')
+    baseline = len(rpc(dict(action='snapshot'))['snapshot']['inventory'].get('terminals', []))
+    markers = [f'focus-{time.time_ns()}-{step}' for step in range(2)]
+    try:
+        for step, marker in enumerate(markers):
+            rpc(dict(action='inventory', kind='terminals', id=marker, present=True))
+            browser('wait', '--fn', f"document.querySelector('#sb-terminals').ariaLabel === '{baseline + step + 1} terminals'")
+            test.assertTrue(evaluate(f"document.querySelector({json.dumps(selector)}) === window.focusControl && document.activeElement === window.focusControl"))
+            test.assertEqual(evaluate('window.focusControl.checked'), initial if step == 0 else not initial)
+            print(f'{selector}: successful poll marker {step + 1} rendered with focus intact', flush=True)
+            if step == 0:
+                browser('press', 'Space')
+                browser('wait', '--fn', f"!window.focusControl.disabled && window.focusControl.checked === {str(not initial).lower()}")
+                test.assertEqual(rpc(dict(action='snapshot'))['snapshot']['visibility']['claude'], not initial)
+                print(f'{selector}: Space persisted checked={not initial}', flush=True)
+        return not initial
+    finally:
+        for marker in markers:
+            rpc(dict(action='inventory', kind='terminals', id=marker, present=False))
+
+
 def verify_status_bar(test, browser, evaluate, ipc):
     shots = Path('/tmp/orquesta-ui-shots')
     shots.mkdir(parents=True, exist_ok=True)
@@ -128,8 +154,7 @@ def verify_status_bar(test, browser, evaluate, ipc):
         test.assertTrue(evaluate("document.querySelector('#sb-menu').matches(':popover-open')"))
         browser('click', '#sb-settings-open')
         test.assertEqual(evaluate("document.querySelectorAll('#sb-settings input[data-key]').length"), 15)
-        browser('focus', '#sb-settings input[data-key=claude]')
-        test.assertTrue(evaluate("new Promise(resolve => setTimeout(() => resolve(document.activeElement.matches('#sb-settings input[data-key=claude]')), 3500))"))
+        verify_checkbox_poll_focus(test, browser, evaluate, ipc, '#sb-settings input[data-key=claude]')
         for key in ['claude', 'decision:local', 'resources', 'ports', 'hosts']:
             browser('uncheck', f'#sb-settings input[data-key="{key}"]')
         browser('check', '#sb-settings input[data-mode="detailed"]')
