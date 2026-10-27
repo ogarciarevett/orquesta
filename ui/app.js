@@ -21,11 +21,13 @@ element('theme').onclick = () => {
   theme(next);
   localStorage.setItem(preference + 'theme', next);
 };
-// Close events are queued; remember whether each close was an explicit dismissal.
+// Close events are queued; retain their focus policy until each event is handled.
 function closeInbox(returnFocus) {
   if (!inbox.open) return;
-  closeReturns.push(returnFocus);
+  const closure = { returnFocus };
+  closeReturns.push(closure);
   inbox.close();
+  closure.focusAfterClose = document.activeElement;
 }
 function layout() {
   const focused = document.activeElement;
@@ -40,10 +42,10 @@ element('inbox-toggle').onclick = () => { if (inbox.open) closeInbox(true); else
 element('inbox-close').onclick = () => closeInbox(true);
 inbox.oncancel = event => { event.preventDefault(); closeInbox(true); };
 inbox.onclose = () => {
-  const returnFocus = closeReturns.shift() ?? true;
+  const closure = closeReturns.shift();
   element('inbox-toggle').setAttribute('aria-expanded', String(inbox.open));
   const focused = document.activeElement;
-  if (returnFocus && !inbox.open && (!focused || focused === document.body || inbox.contains(focused))) element('inbox-toggle').focus();
+  if ((closure?.returnFocus ?? true) && !inbox.open && (!closure || focused === closure.focusAfterClose)) element('inbox-toggle').focus();
 };
 document.querySelectorAll('a[href="#settingsdialog"]').forEach(link => { link.onclick = event => { event.preventDefault(); settings.showModal(); }; });
 element('settings-close').onclick = () => settings.close();

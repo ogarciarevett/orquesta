@@ -113,6 +113,19 @@ class FocusUI(unittest.TestCase):
                 browser('screenshot', str(SHOTS / f'focus-hidden-{count}.png'))
                 print(f'{selector}: hidden panel returned focus after successful poll', flush=True)
 
+    def test_explicit_dismissal_returns_trigger_after_native_focus_restore(self):
+        browser('set', 'viewport', '375', '900')
+        browser('wait', '--fn', "!document.querySelector('#inbox').open")
+        before = self.prepare_draft()
+        evaluate("document.querySelector('#inbox-toggle').click()")
+        self.assertTrue(evaluate("document.querySelector('#inbox').matches(':modal')"))
+        browser('press', 'Escape')
+        browser('wait', '--fn', "!document.querySelector('#inbox').open && document.activeElement.id === 'inbox-toggle'")
+        after = self.draft_state()
+        for key in ['sameNode', 'value', 'start', 'end', 'direction', 'sent']:
+            self.assertEqual(after[key], before[key])
+        self.assertGreater(after['focusLosses'], 0)
+
     def test_checkbox_space_persists_across_successful_menu_and_settings_polls(self):
         for surface in ['sb-menu', 'sb-settings']:
             with self.subTest(surface=surface):
