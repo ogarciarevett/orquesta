@@ -171,7 +171,10 @@ fn malformed_storage_and_obstructed_write_never_reset_state() -> Result<()> {
         ("/automations/counter", json!(u64::MAX)),
         ("/automations/revision", json!(u64::MAX)),
         ("/automations/definitions/0/draft/path", json!("/tmp")),
-        ("/automations/definitions/0/draft/schedule/host", json!("local")),
+        (
+            "/automations/definitions/0/draft/schedule/host",
+            json!("local"),
+        ),
     ] {
         let mut state = original.clone();
         let (parent, field) = pointer.rsplit_once('/').unwrap();
