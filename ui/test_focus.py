@@ -47,15 +47,17 @@ class FocusUI(unittest.TestCase):
           return {sameNode: draft === window.focusDraft, value: draft.value,
             start: draft.selectionStart, end: draft.selectionEnd,
             direction: draft.selectionDirection, focus: document.activeElement.id,
-            sent: document.querySelector('#submissions').value};
+            sent: document.querySelector('#submissions').value, focusLosses: window.focusLosses};
         })()""")
 
     def test_composer_survives_polls_and_both_resize_directions(self):
         browser('fill', '#draft', 'first line\nsecond λ line\nlast line')
         evaluate("window.focusDraft = document.querySelector('#draft'); window.focusDraft.setSelectionRange(4, 22, 'backward')")
+        evaluate("window.focusLosses = 0; window.focusDraft.addEventListener('blur', () => window.focusLosses++)")
         before = self.draft_state()
         self.assertEqual(before['focus'], 'draft')
         self.assertEqual(before['sent'], '0')
+        self.assertEqual((before['start'], before['end'], before['direction']), (4, 22, 'backward'))
         for count, width in enumerate([699, 701, 375, 1280], 1):
             with self.subTest(width=width):
                 browser('focus', '#draft')
@@ -83,7 +85,7 @@ class FocusUI(unittest.TestCase):
             else:
                 browser('click', '#inbox-close')
             browser('wait', '--fn', "!document.querySelector('#inbox').open && document.activeElement.id === 'inbox-toggle'")
-            expected = dict(before, focus='inbox-toggle')
+            expected = dict(before, focus='inbox-toggle', focusLosses=1)
             self.assertEqual(self.draft_state(), expected)
             self.assertEqual(evaluate("document.querySelector('#inbox-toggle').getAttribute('aria-expanded')"), 'false')
 

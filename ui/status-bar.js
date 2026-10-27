@@ -85,7 +85,13 @@
         const id = `${container.parentElement.id}:${key}`;
         if (!controls.has(id)) {
           const label = node('label'), input = Object.assign(node('input'), { type: 'checkbox' }); input.dataset.key = key;
-          input.onchange = async () => { input.disabled = true; try { render(await request({ action: 'visibility', key, visible: input.checked })); } finally { input.disabled = false; } };
+          // Keep the focused checkbox in the tab order while its write is pending.
+          input.onclick = event => { if (input.getAttribute('aria-disabled') === 'true') event.preventDefault(); };
+          input.onchange = async () => {
+            input.setAttribute('aria-disabled', 'true');
+            try { render(await request({ action: 'visibility', key, visible: input.checked })); }
+            finally { input.removeAttribute('aria-disabled'); }
+          };
           label.append(input, node('span', name)); container.insertBefore(label, container.querySelector('[data-mode]')?.parentElement || null); controls.set(id, input);
         }
         controls.get(id).checked = state.snapshot.visibility[key] !== false;

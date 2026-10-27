@@ -1,10 +1,13 @@
-// Copyright (c) 2026 Lovecast Inc. SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Lovecast Inc.
+// Copyright (c) 2026 Omar Garcia
+// SPDX-License-Identifier: MIT
 const element = id => document.getElementById(id);
 const recipient = 'session:s';
 const preference = `orquesta:host:${location.host}:`;
 const safety = element('safety'), inbox = element('inbox'), settings = element('settingsdialog');
 const mobile = matchMedia('(max-width: 700px)');
 const rows = new Map();
+const closeReturns = [];
 let connected = true, pending = false, generation = 0;
 safety.checked = localStorage.getItem(preference + 'notifications') !== 'false';
 safety.onchange = () => { localStorage.setItem(preference + 'notifications', safety.checked); if (!safety.checked) element('notice').textContent = ''; };
@@ -18,12 +21,29 @@ element('theme').onclick = () => {
   theme(next);
   localStorage.setItem(preference + 'theme', next);
 };
-function layout() { inbox.close(); if (!mobile.matches) inbox.show(); element('inbox-toggle').setAttribute('aria-expanded', String(inbox.open)); }
+// Close events are queued; remember whether each close was an explicit dismissal.
+function closeInbox(returnFocus) {
+  if (!inbox.open) return;
+  closeReturns.push(returnFocus);
+  inbox.close();
+}
+function layout() {
+  const focused = document.activeElement;
+  closeInbox(false);
+  if (!mobile.matches) inbox.open = true;
+  element('inbox-toggle').setAttribute('aria-expanded', String(inbox.open));
+  if (focused === element('draft') && document.activeElement !== focused) focused.focus({ preventScroll: true });
+}
 layout();
 mobile.onchange = layout;
-element('inbox-toggle').onclick = () => { if (inbox.open) inbox.close(); else if (mobile.matches) inbox.showModal(); else inbox.show(); element('inbox-toggle').setAttribute('aria-expanded', String(inbox.open)); };
-element('inbox-close').onclick = () => inbox.close();
-inbox.onclose = () => { element('inbox-toggle').setAttribute('aria-expanded', String(inbox.open)); if (!inbox.open) element('inbox-toggle').focus(); };
+element('inbox-toggle').onclick = () => { if (inbox.open) closeInbox(true); else if (mobile.matches) inbox.showModal(); else inbox.show(); element('inbox-toggle').setAttribute('aria-expanded', String(inbox.open)); };
+element('inbox-close').onclick = () => closeInbox(true);
+inbox.oncancel = event => { event.preventDefault(); closeInbox(true); };
+inbox.onclose = () => {
+  const returnFocus = closeReturns.shift() ?? true;
+  element('inbox-toggle').setAttribute('aria-expanded', String(inbox.open));
+  if (returnFocus && !inbox.open) element('inbox-toggle').focus();
+};
 document.querySelectorAll('a[href="#settingsdialog"]').forEach(link => { link.onclick = event => { event.preventDefault(); settings.showModal(); }; });
 element('settings-close').onclick = () => settings.close();
 async function ipc(command, fields = {}) {
