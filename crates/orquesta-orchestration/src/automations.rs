@@ -108,7 +108,11 @@ impl Catalog {
 
 impl Mailbox {
     pub fn automation_snapshot(&self) -> Result<AutomationSnapshot> {
-        self.transaction(|state| state.automations.snapshot(&state.sidebar.snapshot().projects))
+        self.transaction(|state| {
+            state
+                .automations
+                .snapshot(&state.sidebar.snapshot().projects)
+        })
     }
 
     pub fn automation_save(
