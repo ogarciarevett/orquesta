@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "identifier": "dev.orquesta.desktop",
   "build": {
-    "frontendDist": ["../ui/index.html", "../ui/style.css", "../ui/app.js", "../ui/status-bar.css", "../ui/status-bar.js", "../ui/native.js"]
+    "frontendDist": ["../ui/index.html", "../ui/style.css", "../ui/app.js", "../ui/status-bar.css", "../ui/status-bar.js", "../ui/native.js", "../ui/sidebar.js", "../ui/sidebar.css"]
   },
   "app": {
     "withGlobalTauri": true,

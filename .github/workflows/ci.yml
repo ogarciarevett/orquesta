@@ -33,6 +33,9 @@ jobs:
         with:
           version: 12.14.0
       - run: pnpm --dir .orca-reference install --frozen-lockfile --ignore-scripts
+      - run: python3 -m unittest discover -s ui -p test_sidebar.py -v
+        env:
+          ORCA_REFERENCE_ROOT: ${{ github.workspace }}/.orca-reference
       - run: python3 ui/test_ui.py
         env:
           ORCA_REFERENCE_ROOT: ${{ github.workspace }}/.orca-reference

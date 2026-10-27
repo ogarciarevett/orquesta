@@ -38,7 +38,15 @@ function Reference() {
 }
 export const reference = defineFixture({ render: () => <Reference /> });
 `);
+const sidebarFixture = join(root, 'src/renderer/src/components/sidebar/orquesta-reference.fixture.tsx');
+writeFileSync(sidebarFixture, `// Copyright (c) 2026 Lovecast Inc. SPDX-License-Identifier: MIT
+import React from 'react';
+import { defineFixture } from '../../component-fixtures/component-fixture';
+import { HostSectionHeader } from './worktree-list/rows/HostSectionHeader';
+import { TooltipProvider } from '../ui/tooltip';
+export const reference = defineFixture({ render: () => <TooltipProvider><aside className="w-[280px] h-screen bg-worktree-sidebar text-worktree-sidebar-foreground"><HostSectionHeader row={{type: 'host-header', key: 'host:local', hostId: 'local', kind: 'local', label: 'This Mac', detail: '', health: 'local', collapsed: false, count: 1}} onToggle={() => {}} /><p>Host header component fixture only</p></aside></TooltipProvider> });
+`);
 const server = spawn(process.execPath, [join(root, 'node_modules/vite/bin/vite.js'), '--config', 'config/vite.fixtures.config.ts', '--host', '127.0.0.1', '--port', '5179', '--strictPort'], { cwd: root, stdio: 'inherit' });
-const cleanup = () => { server.kill('SIGTERM'); rmSync(fixture, { force: true }); };
+const cleanup = () => { server.kill('SIGTERM'); rmSync(fixture, { force: true }); rmSync(sidebarFixture, { force: true }); };
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { cleanup(); process.exit(); });
-server.on('exit', code => { rmSync(fixture, { force: true }); process.exit(code || 0); });
+server.on('exit', code => { rmSync(fixture, { force: true }); rmSync(sidebarFixture, { force: true }); process.exit(code || 0); });

@@ -50,6 +50,27 @@ jobs:
           npx --yes @tauri-apps/cli@2.12.4 build --target aarch64-apple-darwin --no-bundle --features native-smoke --config smoke.conf.json -- --locked --offline
           target/aarch64-apple-darwin/release/orquesta-desktop > evidence/smoke.log 2>&1 &
           smoke_pid=$!
+          mkdir -p /tmp/orquesta-picked-folder
+          (
+            sleep 8
+            screencapture -x evidence/native-picker.png
+            osascript <<'APPLESCRIPT'
+          tell application "System Events"
+            tell process "orquesta-desktop"
+              set frontmost to true
+              key code 53
+              delay 2
+              keystroke "g" using {command down, shift down}
+              delay 1
+              keystroke "/tmp/orquesta-picked-folder"
+              key code 36
+              delay 2
+              key code 36
+            end tell
+          end tell
+          APPLESCRIPT
+          ) > evidence/picker-driver.log 2>&1 &
+          picker_pid=$!
           for attempt in $(seq 1 60); do
             if grep -q NATIVE_WINDOW_LOADED evidence/smoke.log && test ! -f evidence/native-window.png; then
               screencapture -x evidence/native-window.png
@@ -57,7 +78,7 @@ jobs:
             if test -f smoke-result.json; then break; fi
             sleep 1
           done
-          kill "$smoke_pid" 2>/dev/null || true
+          kill "$smoke_pid" "$picker_pid" 2>/dev/null || true
           test -f smoke-result.json
           cp smoke-result.json evidence/
           python3 -c 'import json; assert json.load(open("smoke-result.json"))["success"]'

@@ -47,7 +47,7 @@ class InboxUI(unittest.TestCase):
                     self.fail("UI host failed to start")
                 SHOTS.mkdir(parents=True, exist_ok=True)
                 browser("open", URL)
-                browser("set", "viewport", "1280", "900")
+                browser("set", "viewport", "1400", "900")
                 browser("fill", "#draft", "first line\nsecond λ line\nlast line")
                 evaluate("document.querySelector('#draft').setSelectionRange(4, 15, 'backward')")
                 state = "(() => { const d = document.querySelector('#draft'); return [d.value, d.selectionStart, d.selectionEnd, d.selectionDirection, document.querySelector('#submissions').textContent]; })()"
@@ -83,7 +83,7 @@ class InboxUI(unittest.TestCase):
                 browser("press", "Escape")
                 self.assertTrue(evaluate("document.querySelector('#inbox').open && !document.querySelector('#settingsdialog').open && !document.querySelector('#notice').textContent"))
                 browser("click", "#inbox-close")
-                browser("set", "viewport", "1280", "900")
+                browser("set", "viewport", "1400", "900")
                 browser("screenshot", str(SHOTS / "unread-row.png"))
                 browser("focus", "#draft")
                 browser("press", "Escape")

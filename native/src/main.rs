@@ -2,16 +2,21 @@
 use orquesta_orchestration::{
     Mailbox,
     runtime::{Operation, Runtime},
+    sidebar::Preference,
     status_bar::{Action, DisplayMode},
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
 use tauri::Manager;
+use tauri_plugin_dialog::DialogExt;
 
 const RECIPIENT: &str = "session:s";
 #[derive(Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 enum DesktopRequest {
+    AddProject {},
+    Sidebar {},
+    SidebarPreference { revision: u64, patch: Preference },
     Inbox {},
     Read {},
     Reconnect {},
@@ -23,6 +28,11 @@ enum DesktopRequest {
 }
 fn dispatch(runtime: &Runtime, request: DesktopRequest) -> Result<Value, String> {
     let operation = match request {
+        DesktopRequest::AddProject {} => return Err("Native picker required".into()),
+        DesktopRequest::Sidebar {} => return sidebar_value(runtime.0.sidebar_snapshot()),
+        DesktopRequest::SidebarPreference { revision, patch } => {
+            return sidebar_value(runtime.0.sidebar_preference(revision, patch));
+        }
         DesktopRequest::Inbox {} => Operation::Inbox {
             recipient: Some(RECIPIENT.into()),
         },
@@ -54,6 +64,12 @@ fn dispatch(runtime: &Runtime, request: DesktopRequest) -> Result<Value, String>
     }
     Ok(result)
 }
+fn sidebar_value(
+    result: orquesta_orchestration::Result<impl serde::Serialize>,
+) -> Result<Value, String> {
+    let snapshot = result.map_err(|error| error.to_string())?;
+    serde_json::to_value(snapshot).map_err(|error| error.to_string())
+}
 #[tauri::command]
 async fn desktop_request(
     window: tauri::WebviewWindow,
@@ -63,9 +79,24 @@ async fn desktop_request(
     if window.label() != "main" || !local_url(&window.url().map_err(|error| error.to_string())?) {
         return Err("Untrusted desktop caller".into());
     }
-    tauri::async_runtime::spawn_blocking(move || dispatch(app.state::<Runtime>().inner(), request))
-        .await
-        .map_err(|error| error.to_string())?
+    tauri::async_runtime::spawn_blocking(move || {
+        if matches!(request, DesktopRequest::AddProject {}) {
+            let selected = app
+                .dialog()
+                .file()
+                .set_parent(&window)
+                .set_title("Add project")
+                .set_can_create_directories(false)
+                .blocking_pick_folder()
+                .map(|path| path.into_path())
+                .transpose()
+                .map_err(|e| e.to_string())?;
+            return sidebar_value(app.state::<Runtime>().0.sidebar_add_project(selected));
+        }
+        dispatch(app.state::<Runtime>().inner(), request)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 fn local_url(url: &tauri::Url) -> bool {
     url.scheme() == "tauri" && url.host_str() == Some("localhost")
@@ -81,7 +112,7 @@ fn smoke_complete(app: tauri::AppHandle, success: bool, detail: String) {
     app.exit(if success { 0 } else { 1 });
 }
 fn main() {
-    let builder = tauri::Builder::default();
+    let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
     #[cfg(feature = "native-smoke")]
     let builder = builder.invoke_handler(tauri::generate_handler![desktop_request, smoke_complete]);
     #[cfg(not(feature = "native-smoke"))]
@@ -147,6 +178,28 @@ mod tests {
         let runtime = Runtime(mailbox);
         let inbox = dispatch(&runtime, DesktopRequest::Inbox {}).unwrap();
         assert_eq!(inbox.as_array().unwrap().len(), 1);
+        let sidebar = dispatch(&runtime, DesktopRequest::Sidebar {}).unwrap();
+        assert_eq!(sidebar["projects"], json!([]));
+        runtime
+            .0
+            .sidebar_add_project(Some(directory.clone()))
+            .unwrap();
+        let sidebar = dispatch(&runtime, DesktopRequest::Sidebar {}).unwrap();
+        let selected = sidebar["projects"][0]["workspace_id"].as_str().unwrap();
+        dispatch(
+            &runtime,
+            DesktopRequest::SidebarPreference {
+                revision: sidebar["revision"].as_u64().unwrap(),
+                patch: Preference::Select {
+                    workspace_id: selected.into(),
+                },
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            dispatch(&runtime, DesktopRequest::Inbox {}).unwrap()[0]["read"],
+            false
+        );
         dispatch(&runtime, DesktopRequest::Read {}).unwrap();
         assert_eq!(
             dispatch(&runtime, DesktopRequest::Reconnect {}).unwrap()[0]["id"],
@@ -177,6 +230,9 @@ mod tests {
     #[test]
     fn rejects_webview_authority_expansion() {
         for input in [
+            r#"{"kind":"add_project","path":"/tmp"}"#,
+            r#"{"kind":"sidebar_preference","revision":0,"patch":{"action":"select","workspace_id":"folder-1","path":"/tmp"}}"#,
+            r#"{"kind":"sidebar","executable":"git"}"#,
             r#"{"kind":"send"}"#,
             r#"{"kind":"inbox","recipient":"session:other"}"#,
             r#"{"kind":"status","path":"/tmp"}"#,

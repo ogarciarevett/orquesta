@@ -42,5 +42,9 @@ never accept a webview-supplied path. Canonical roots remain in mailbox storage;
 need not be Git repositories. Selection and host/project collapse preferences
 use catalog IDs and revision checks and persist in the same atomic transaction
 as existing mail and status preferences. Cancellation makes no storage change.
-The native picker and rendered sidebar follow in a dependent slice; Git discovery,
-remote hosts, filtering, resizing, and live agents remain outside this core unit.
+The desktop sidebar opens a native existing-folder picker through Add project;
+selection and collapse are stored using the catalog revision. At 1280px the inbox
+opens as an overlay so the 280px sidebar retains a 640px main area. At <=920px,
+Projects opens a sheet; selecting a folder or Escape closes it and returns focus.
+Git discovery, remote hosts, filtering, resizing, multi-selection, and live agents
+remain outside this slice; a folder row does not claim Git or agent status.

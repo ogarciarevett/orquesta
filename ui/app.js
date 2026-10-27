@@ -5,7 +5,7 @@ const element = id => document.getElementById(id);
 const recipient = 'session:s';
 const preference = `orquesta:host:${location.host}:`;
 const safety = element('safety'), inbox = element('inbox'), settings = element('settingsdialog');
-const mobile = matchMedia('(max-width: 700px)');
+const mobile = matchMedia('(max-width: 1300px)');
 const rows = new Map();
 const closeReturns = [];
 let connected = true, pending = false, generation = 0;
