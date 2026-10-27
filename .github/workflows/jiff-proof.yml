@@ -17,6 +17,7 @@ jobs:
     defaults:
       run:
         shell: bash
+        working-directory: ${{ runner.temp }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,10 +27,10 @@ jobs:
       - name: Prepare isolated baseline and candidate
         run: |
           mkdir evidence baseline candidate
-          git archive aada0c6d6c7c3eae269ce3097a1ee9ef4fad4cbd | tar -x -C baseline
-          git archive aada0c6d6c7c3eae269ce3097a1ee9ef4fad4cbd | tar -x -C candidate
-          git rev-parse HEAD > evidence/probe-head.txt
-          git rev-parse aada0c6d6c7c3eae269ce3097a1ee9ef4fad4cbd > evidence/source-head.txt
+          git -C "$GITHUB_WORKSPACE" archive aada0c6d6c7c3eae269ce3097a1ee9ef4fad4cbd | tar -x -C baseline
+          git -C "$GITHUB_WORKSPACE" archive aada0c6d6c7c3eae269ce3097a1ee9ef4fad4cbd | tar -x -C candidate
+          git -C "$GITHUB_WORKSPACE" rev-parse HEAD > evidence/probe-head.txt
+          git -C "$GITHUB_WORKSPACE" rev-parse aada0c6d6c7c3eae269ce3097a1ee9ef4fad4cbd > evidence/source-head.txt
           rustc +1.89.0 -Vv > evidence/rust-1.89.txt
           rustc +1.99.1 -Vv > evidence/rust-1.99.txt
           python3 - <<'PY'
@@ -91,6 +92,8 @@ jobs:
                          'changed': [{'before': bp[k], 'after': cp[k]} for k in bp.keys() & cp.keys() if bp[k] != cp[k]]}
               (evidence / f'{workspace}-package-delta.json').write_text(json.dumps(changes, indent=2))
           for meta in evidence.glob('*/*/metadata-*.json'):
+              if not meta.stat().st_size:
+                  continue
               data = json.loads(meta.read_text())
               lock = tomllib.loads((meta.parent / 'Cargo.lock').read_text())
               checksums = {(p['name'], p['version'], p.get('source')): p.get('checksum') for p in lock['package']}
@@ -179,10 +182,10 @@ jobs:
           PY
       - name: Verify tracked production files unchanged
         if: always()
-        run: git diff --exit-code -- Cargo.toml Cargo.lock crates/orquesta-orchestration/Cargo.toml native/Cargo.toml native/Cargo.lock LICENSE THIRD_PARTY_NOTICES.md README.md
+        run: git -C "$GITHUB_WORKSPACE" diff --exit-code -- Cargo.toml Cargo.lock crates/orquesta-orchestration/Cargo.toml native/Cargo.toml native/Cargo.lock LICENSE THIRD_PARTY_NOTICES.md README.md
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: jiff-proof-${{ matrix.os }}-${{ github.sha }}
-          path: evidence/
+          path: ${{ runner.temp }}/evidence/
           if-no-files-found: error
