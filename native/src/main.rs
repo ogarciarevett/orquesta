@@ -109,6 +109,7 @@ fn main() {
             #[cfg(feature = "native-smoke")]
             let window = window.on_page_load(|window, payload| {
                 if payload.event() == tauri::webview::PageLoadEvent::Finished {
+                    println!("NATIVE_WINDOW_LOADED");
                     window
                         .eval(include_str!("../smoke.js"))
                         .expect("smoke injection");
