@@ -85,10 +85,9 @@
         if (!controls.has(id)) {
           const label = node('label'), input = Object.assign(node('input'), { type: 'checkbox' }); input.dataset.key = key;
           input.onchange = async () => { input.disabled = true; try { render(await request({ action: 'visibility', key, visible: input.checked })); } finally { input.disabled = false; } };
-          label.append(input, node('span', name)); container.append(label); controls.set(id, input);
+          label.append(input, node('span', name)); container.insertBefore(label, container.querySelector('[data-mode]')?.parentElement || null); controls.set(id, input);
         }
         controls.get(id).checked = state.snapshot.visibility[key] !== false;
-        container.insertBefore(controls.get(id).parentElement, container.querySelector('[data-mode]')?.parentElement || null);
       }
       if (!container.querySelector('[data-mode]')) for (const [mode, name, description] of [['compact', 'Compact', 'Condensed usage: one summary per provider'], ['detailed', 'Detailed', 'Full usage with bars, labels, and percentages']]) {
         const label = node('label'), input = Object.assign(node('input'), { type: 'radio', name: `${container.parentElement.id}-mode`, value: mode }); input.dataset.mode = mode;

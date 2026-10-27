@@ -128,6 +128,8 @@ def verify_status_bar(test, browser, evaluate, ipc):
         test.assertTrue(evaluate("document.querySelector('#sb-menu').matches(':popover-open')"))
         browser('click', '#sb-settings-open')
         test.assertEqual(evaluate("document.querySelectorAll('#sb-settings input[data-key]').length"), 15)
+        browser('focus', '#sb-settings input[data-key=claude]')
+        test.assertTrue(evaluate("new Promise(resolve => setTimeout(() => resolve(document.activeElement.matches('#sb-settings input[data-key=claude]')), 3500))"))
         for key in ['claude', 'decision:local', 'resources', 'ports', 'hosts']:
             browser('uncheck', f'#sb-settings input[data-key="{key}"]')
         browser('check', '#sb-settings input[data-mode="detailed"]')
