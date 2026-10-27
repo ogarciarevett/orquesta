@@ -1,0 +1,53 @@
+/* Copyright (c) 2026 Lovecast Inc. SPDX-License-Identifier: MIT */
+:root { color-scheme: light; --bg: #f5f4ef; --surface: #fffefa; --ink: #202b32; --muted: #52606a; --line: #d4d9d3; --accent: #245943; --tint: #e4eee5; --terminal: #17272c; --terminal-ink: #e3eee9; }
+:root[data-theme="dark"] { color-scheme: dark; --bg: #131d22; --surface: #1a272d; --ink: #edf2ef; --muted: #bac8c6; --line: #3c4e52; --accent: #a1d7b4; --tint: #263e33; --terminal: #101b20; --terminal-ink: #e3eee9; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; }
+button, textarea, input { font: inherit; }
+button { min-height: 44px; padding: 8px 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; white-space: nowrap; }
+button:hover { background: var(--tint); border-color: var(--accent); }
+button:disabled { opacity: .6; cursor: default; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+a { color: var(--accent); }
+body > header { height: 64px; display: flex; justify-content: space-between; align-items: center; padding: 10px 24px; border-bottom: 1px solid var(--line); }
+.brand { color: var(--ink); text-decoration: none; font-size: 20px; font-weight: 700; }
+nav, .heading, .tools, form footer { display: flex; align-items: center; gap: 10px; }
+.heading, form footer { justify-content: space-between; }
+#badge, small { padding: 2px 5px; color: var(--accent); background: var(--tint); border-radius: 3px; font-size: 11px; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: calc(100dvh - 64px); }
+main:has(#inbox:not([open])) { grid-template-columns: minmax(0, 1fr); }
+.terminal { min-width: 0; padding: 24px; }
+h1 { margin: 0 0 24px; font-size: 24px; font-weight: 600; }
+h2 { margin: 0; font-size: 18px; font-weight: 600; }
+h3 { font-size: 14px; font-weight: 500; }
+form label { display: block; margin-bottom: 10px; }
+textarea { display: block; width: 100%; min-height: 320px; resize: vertical; padding: 18px; border: 1px solid var(--line); border-radius: 4px; background: var(--terminal); color: var(--terminal-ink); font: 14px/1.75 ui-monospace, SFMono-Regular, Consolas, monospace; }
+textarea::placeholder { color: #b2c4bf; opacity: 1; }
+#draft-help, .help, #status, #last-good, #notice, .meta { color: var(--muted); font-size: 12px; }
+form footer { margin-top: 18px; }
+.primary { color: var(--surface); background: var(--accent); border-color: var(--accent); }
+.primary:hover { color: var(--surface); background: var(--ink); }
+dialog { color: var(--ink); background: var(--surface); border: 1px solid var(--line); padding: 20px; }
+#inbox { position: static; width: 100%; max-width: none; max-height: none; margin: 0; border-width: 0 0 0 1px; }
+#settingsdialog { width: min(480px, calc(100% - 32px)); border-radius: 5px; }
+dialog::backdrop { background: #0008; }
+#settings-link, #inbox-settings { display: inline-block; margin-block: 12px; }
+.setting { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+input { width: 18px; height: 18px; accent-color: var(--accent); }
+#messages { list-style: none; margin: 16px 0; padding: 0; }
+#messages li { padding: 16px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.message h3 { margin: 8px 0; }
+.unread h3 { font-weight: 700; }
+.state { color: var(--accent); }
+.unread .state { font-weight: 700; }
+.unread .state::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--accent); }
+.body { white-space: pre-wrap; margin: 8px 0; }
+@media (max-width: 700px) {
+  body > header { padding-inline: 16px; }
+  nav { gap: 6px; font-size: 12px; }
+  main { grid-template-columns: minmax(0, 1fr); }
+  .terminal { padding: 20px 16px; }
+  #inbox { position: fixed; inset: 0; width: 100%; height: 100dvh; max-height: none; margin: 0; border: 0; overflow: auto; }
+}

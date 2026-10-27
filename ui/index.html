@@ -1,0 +1,40 @@
+<!doctype html>
+<!-- Copyright (c) 2026 Lovecast Inc. SPDX-License-Identifier: MIT -->
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark"><title>Orquesta · Terminal s</title>
+  <link rel="stylesheet" href="style.css"><script src="app.js" defer></script>
+</head>
+<body>
+  <header><a class="brand" href="/">Orquesta</a><nav aria-label="Workspace controls"><button id="theme" type="button">Dev: Theme</button><button id="inbox-toggle" type="button" aria-controls="inbox" aria-expanded="false">Inbox <span id="badge" hidden>0</span></button></nav></header>
+  <main>
+    <section class="terminal" aria-labelledby="terminal-title">
+      <h1 id="terminal-title">Terminal s</h1>
+      <form id="composer">
+        <label for="draft">Draft</label>
+        <textarea id="draft" name="draft" rows="15" spellcheck="false" placeholder="Start a multi-line draft…" aria-describedby="draft-help"></textarea>
+        <p id="draft-help">Only you can submit this draft. Incoming mail stays in the inbox.</p>
+        <footer><span>Sent: <output id="submissions">0</output></span><button class="primary" type="submit">Submit draft</button></footer>
+      </form>
+      <a id="settings-link" href="#settingsdialog">Inbox settings</a>
+    </section>
+    <dialog id="inbox" aria-labelledby="inbox-title">
+      <div class="heading"><h2 id="inbox-title">Orchestration inbox</h2><button id="inbox-close" type="button">Close</button></div>
+      <a id="inbox-settings" href="#settingsdialog">Inbox settings</a>
+      <div class="tools"><button id="read-batch" type="button">Mark all as read</button><button id="connection" type="button">Disconnect</button></div>
+      <div><span id="status" role="status">Reconnecting…</span> · <time id="last-good">Not synced yet</time><button id="retry" type="button" hidden>Retry</button></div>
+      <p id="notice" role="status" aria-live="polite"></p>
+      <ol id="messages" aria-label="Inbox messages"><li id="empty">Inbox is clear. Incoming messages appear here.</li></ol>
+      <p class="help">Unacknowledged mail replays after reconnect. Acknowledged items stay in history.</p>
+    </dialog>
+  </main>
+  <dialog id="settingsdialog" aria-labelledby="settings-title">
+    <div class="heading"><h2 id="settings-title">Inbox settings</h2><button id="settings-close" type="button">Close</button></div>
+    <h3>AI Capabilities › Orchestration <small>Host</small></h3>
+    <p><strong>Inbox safety</strong></p><p>Draft protection is always on.</p>
+    <h3>Interface › Notifications <small>Host</small></h3>
+    <label class="setting"><input id="safety" type="checkbox" checked> Inbox notifications</label>
+  </dialog>
+</body>
+</html>
