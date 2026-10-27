@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Lovecast Inc. Copyright (c) 2026 Omar Garcia. SPDX-License-Identifier: MIT
 (async () => {
   const invoke = window.__TAURI__.core.invoke;
-  const call = request => invoke('desktop_request', { request });
+  const call = request => request.kind === 'ack' ? window.orquestaNative('ack', request) : invoke('desktop_request', { request });
   try {
     for (let attempt = 0; document.querySelector('#status').textContent !== 'Connected' && attempt < 50; attempt++)
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -18,9 +18,12 @@
     if (persisted.snapshot.display_mode !== 'detailed' || persisted.snapshot.visibility.ports) throw new Error('Settings not persisted');
     for (const request of [{ kind: 'inbox', recipient: 'session:other' }, { kind: 'refresh' }, { kind: 'ack', id: 999999 }]) {
       let rejected = false;
-      try { await call(request); } catch { rejected = true; }
+      try { await call(request); } catch (error) {
+        rejected = request.kind !== 'ack' || error instanceof Error && error.message === 'message not in recipient inbox';
+      }
       if (!rejected) throw new Error('Authority or unavailable operation accepted');
     }
+    document.querySelector('#composer button[type=submit]').scrollIntoView({ block: 'end' });
     await new Promise(resolve => setTimeout(resolve, 2200));
     const after = [draft.value, draft.selectionStart, draft.selectionEnd, draft.selectionDirection, document.activeElement];
     if (draft !== document.querySelector('#draft') || before.some((value, index) => value !== after[index]) || document.querySelector('#submissions').value !== '0') throw new Error('Draft changed');
