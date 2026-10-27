@@ -1,6 +1,7 @@
 /* Copyright (c) 2026 Lovecast Inc. Copyright (c) 2026 Omar Garcia. SPDX-License-Identifier: MIT */
 :root { --bg-titlebar: var(--surface); --sb-off: #697269; --status-warning: #875300; --destructive: #b3261e; --sb-meter: #687776; --sb-track: #d4d9d3; }
 :root[data-theme="dark"] { --sb-off: #a6b4b1; --status-warning: #f7c66b; --destructive: #ffaba5; --sb-meter: #a4b2af; --sb-track: #425352; }
+html { scroll-padding-bottom: 24px; }
 body { padding-bottom: 24px; }
 #status-bar { position: fixed; inset: auto 0 0; height: 24px; padding: 0 12px; display: flex; align-items: center; gap: 16px; border-top: 1px solid var(--line); background: var(--bg-titlebar); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; z-index: 2; }
 #status-bar button { display: inline-flex; align-items: center; gap: 4px; height: 20px; min-height: 20px; padding: 0 2px; border: 0; background: transparent; border-radius: 2px; font: inherit; white-space: nowrap; }
@@ -37,7 +38,7 @@ body { padding-bottom: 24px; }
 .sb-refresh-symbol { display: inline-block; width: 1em; }
 @keyframes sb-turn { to { transform: rotate(360deg); } }
 .sb-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-@media (max-width: 500px) { body { padding-bottom: 44px; } #status-bar { height: 44px; } #status-bar button { min-width: 24px; min-height: 44px; } #sb-usage, #sb-menu { bottom: 52px; } .sb-controls label { min-height: 44px; } }
+@media (max-width: 500px) { html { scroll-padding-bottom: 44px; } body { padding-bottom: 44px; } #status-bar { height: 44px; } #status-bar button { min-width: 24px; min-height: 44px; } #sb-usage, #sb-menu { bottom: 52px; } .sb-controls label { min-height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .sb-refreshing { animation: none; } }
 
 .sb-letter::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; background: currentColor; }

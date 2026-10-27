@@ -153,6 +153,10 @@ def verify_status_bar(test, browser, evaluate, ipc):
             if evaluate('document.documentElement.dataset.theme') != theme:
                 browser('click', '#theme')
             capture(f'detailed-three-1280-{theme}', 'bar', 1280, theme)
+        for width in [1280, 375]:
+            browser('set', 'viewport', str(width), '900')
+            evaluate("document.querySelector('#composer button[type=submit]').scrollIntoView({block:'end'})")
+            test.assertTrue(evaluate("document.querySelector('#composer button[type=submit]').getBoundingClientRect().bottom <= document.querySelector('#status-bar').getBoundingClientRect().top"))
         (shots/'comparison.html').write_text('<!doctype html><title>Status bar comparison</title><style>table{width:100%}img{width:100%}td{width:48%}</style><h1>Orquesta and isolated upstream usage components</h1><p>Fixture data, not live provider validation. Reference excludes the surface controller, inventory, and density behavior.</p><table>'+''.join(gallery)+'</table>')
     finally:
         if reference:

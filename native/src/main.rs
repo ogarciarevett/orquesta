@@ -145,14 +145,8 @@ mod tests {
         };
         let message = mailbox.send(envelope).unwrap();
         let runtime = Runtime(mailbox);
-        assert_eq!(
-            dispatch(&runtime, DesktopRequest::Inbox {})
-                .unwrap()
-                .as_array()
-                .unwrap()
-                .len(),
-            1
-        );
+        let inbox = dispatch(&runtime, DesktopRequest::Inbox {}).unwrap();
+        assert_eq!(inbox.as_array().unwrap().len(), 1);
         dispatch(&runtime, DesktopRequest::Read {}).unwrap();
         assert_eq!(
             dispatch(&runtime, DesktopRequest::Reconnect {}).unwrap()[0]["id"],
