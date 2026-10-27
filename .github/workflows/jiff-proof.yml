@@ -1,0 +1,186 @@
+# Copyright (c) 2026 Lovecast Inc. Copyright (c) 2026 Omar Garcia. SPDX-License-Identifier: MIT
+name: Jiff dependency proof (temporary)
+on:
+  push:
+    branches: [probe/jiff-dependency-proof]
+    paths: [.github/workflows/jiff-proof.yml]
+permissions:
+  contents: read
+jobs:
+  resolution:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-15, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - name: Prepare isolated baseline and candidate
+        run: |
+          mkdir evidence baseline candidate
+          git archive aada0c6d6c7c3eae269ce3097a1ee9ef4fad4cbd | tar -x -C baseline
+          git archive aada0c6d6c7c3eae269ce3097a1ee9ef4fad4cbd | tar -x -C candidate
+          git rev-parse HEAD > evidence/probe-head.txt
+          git rev-parse aada0c6d6c7c3eae269ce3097a1ee9ef4fad4cbd > evidence/source-head.txt
+          rustc +1.89.0 -Vv > evidence/rust-1.89.txt
+          rustc +1.99.1 -Vv > evidence/rust-1.99.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('candidate/crates/orquesta-orchestration/Cargo.toml')
+          p.write_text(p.read_text() + '\njiff = { version = "=0.2.38", default-features = false, features = ["std", "tzdb-bundle-always"] }\n')
+          for variant in ('baseline', 'candidate'):
+              for rel in ('Cargo.toml', 'crates/orquesta-orchestration/Cargo.toml', 'native/Cargo.toml'):
+                  dest = Path('evidence') / variant / rel
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  dest.write_bytes((Path(variant) / rel).read_bytes())
+          PY
+      - name: Resolve both workspaces conservatively and record target feature closure
+        run: |
+          host=$(rustc +1.99.1 -vV | sed -n 's/^host: //p')
+          for variant in baseline candidate; do
+            for workspace in root native; do
+              directory="$variant"
+              toolchain=1.89.0
+              if test "$workspace" = native; then directory="$variant/native"; toolchain=1.99.1; fi
+              out="$PWD/evidence/$variant/$workspace"
+              mkdir -p "$out"
+              # Native starts with the exact tracked lock; metadata adds only needed entries.
+              cargo +"$toolchain" metadata --manifest-path "$directory/Cargo.toml" --format-version 1 > "$out/metadata-all.json"
+              cp "$directory/Cargo.lock" "$out/Cargo.lock"
+              cargo +"$toolchain" fetch --manifest-path "$directory/Cargo.toml" --locked --target "$host"
+              targets="$host"
+              if test "$RUNNER_OS" = macOS; then targets="$host x86_64-apple-darwin"; fi
+              for target in $targets; do
+                cargo +"$toolchain" metadata --manifest-path "$directory/Cargo.toml" --locked --format-version 1 --filter-platform "$target" > "$out/metadata-$target.json"
+                cargo +"$toolchain" tree --manifest-path "$directory/Cargo.toml" --locked --target "$target" -e features > "$out/features-$target.txt"
+                cargo +"$toolchain" tree --manifest-path "$directory/Cargo.toml" --locked --target "$target" -i jiff -e features > "$out/jiff-inverse-$target.txt" 2>&1 || test "$variant-$workspace" = baseline-root
+              done
+            done
+          done
+      - name: Enumerate generated changes, package identities, licenses and declared MSRV
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import difflib, hashlib, json, shutil, tomllib
+          from pathlib import Path
+          evidence = Path('evidence')
+          for workspace in ('root', 'native'):
+              old = evidence / 'baseline' / workspace / 'Cargo.lock'
+              new = evidence / 'candidate' / workspace / 'Cargo.lock'
+              if not old.exists() or not new.exists():
+                  continue
+              before, after = old.read_text().splitlines(True), new.read_text().splitlines(True)
+              diff = list(difflib.unified_diff(before, after, fromfile='baseline/Cargo.lock', tofile='candidate/Cargo.lock'))
+              (evidence / f'{workspace}-lock.diff').write_text(''.join(diff))
+              counts = {'baseline_lines': len(before), 'candidate_lines': len(after),
+                        'added': sum(x.startswith('+') and not x.startswith('+++') for x in diff),
+                        'deleted': sum(x.startswith('-') and not x.startswith('---') for x in diff)}
+              (evidence / f'{workspace}-lock-counts.json').write_text(json.dumps(counts, indent=2))
+              key = lambda p: (p['name'], p['version'], p.get('source'))
+              bp = {key(p): p for p in tomllib.loads(old.read_text())['package']}
+              cp = {key(p): p for p in tomllib.loads(new.read_text())['package']}
+              changes = {'added': [cp[k] for k in cp.keys()-bp.keys()], 'removed': [bp[k] for k in bp.keys()-cp.keys()],
+                         'changed': [{'before': bp[k], 'after': cp[k]} for k in bp.keys() & cp.keys() if bp[k] != cp[k]]}
+              (evidence / f'{workspace}-package-delta.json').write_text(json.dumps(changes, indent=2))
+          for meta in evidence.glob('*/*/metadata-*.json'):
+              data = json.loads(meta.read_text())
+              lock = tomllib.loads((meta.parent / 'Cargo.lock').read_text())
+              checksums = {(p['name'], p['version'], p.get('source')): p.get('checksum') for p in lock['package']}
+              active = {n['id'] for n in data['resolve']['nodes']}
+              rows = []
+              for p in data['packages']:
+                  rows.append({k: p.get(k) for k in ('id', 'name', 'version', 'source', 'license', 'license_file', 'rust_version')})
+                  rows[-1].update(checksum=checksums.get((p['name'], p['version'], p['source'])), resolved=p['id'] in active)
+                  assert not (p['source'] or '').startswith('git+'), p['id']
+                  if meta.name != 'metadata-all.json' or not p['source']:
+                      continue
+                  src = Path(p['manifest_path']).parent
+                  dest = evidence / 'package-notices' / (p['name'] + '-' + p['version'])
+                  dest.mkdir(parents=True, exist_ok=True)
+                  for f in src.iterdir():
+                      if f.is_file() and any(t in f.name.upper() for t in ('LICENSE', 'COPYING', 'NOTICE', 'UNLICENSE')):
+                          shutil.copyfile(f, dest / f.name)
+                  if p['name'].startswith('jiff'):
+                      shutil.copyfile(src / 'Cargo.toml', dest / 'Cargo.toml')
+                      for rel in ('src/tz/db/mod.rs', 'src/lib.rs'):
+                          if (src / rel).exists():
+                              shutil.copyfile(src / rel, dest / rel.replace('/', '-'))
+              meta.with_name(meta.stem + '-packages.json').write_text(json.dumps(rows, indent=2))
+          sums = []
+          for p in sorted(evidence.rglob('*')):
+              if p.is_file():
+                  sums.append(hashlib.sha256(p.read_bytes()).hexdigest() + '  ' + str(p.relative_to(evidence)))
+          (evidence / 'SHA256SUMS').write_text('\n'.join(sums) + '\n')
+          PY
+      - name: Core Rust 1.89 compatibility and identical-flags size probe
+        run: |
+          for variant in baseline candidate; do
+            cargo +1.89.0 test --manifest-path "$variant/Cargo.toml" --workspace --locked --offline > "evidence/$variant/core-test-1.89.txt" 2>&1
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          for variant in ('baseline', 'candidate'):
+              dest = Path(variant) / 'crates/orquesta-orchestration/examples/dependency_size.rs'
+              dest.parent.mkdir(exist_ok=True)
+              # This is a retained-code demonstration, not a production scheduler or API.
+              body = 'println!("{}", std::env::args().nth(1).unwrap_or_else(|| "Europe/Madrid".into()));'
+              if variant == 'candidate':
+                  body = 'let db = jiff::tz::TimeZoneDatabase::bundled(); let name = std::env::args().nth(1).unwrap_or_else(|| "Europe/Madrid".into()); let zone = db.get(&name).unwrap(); println!("{}", zone.iana_name().unwrap()); assert!(db.get("invalid/zone").is_err());'
+              dest.write_text('fn main() { ' + body + ' }\n')
+          PY
+          for variant in baseline candidate; do
+            cargo +1.89.0 build --manifest-path "$variant/Cargo.toml" --example dependency_size --release --locked --offline
+            cargo +1.89.0 run --manifest-path "$variant/Cargo.toml" --example dependency_size --release --locked --offline -- Europe/Madrid > "evidence/$variant/bundled-probe.txt"
+          done
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          rows = {}
+          for variant in ('baseline', 'candidate'):
+              rows[variant] = next(p.stat().st_size for p in (Path(variant) / 'target/release/examples').glob('dependency_size*') if p.suffix in ('', '.exe') and p.is_file())
+          rows.update(delta=rows['candidate']-rows['baseline'], flags='cargo +1.89.0 build --example dependency_size --release --locked --offline; default release profile; no RUSTFLAGS override', limitation='Synthetic retained bundled lookup versus echo; not a forecast of scheduling implementation or native size')
+          Path('evidence/core-size.json').write_text(json.dumps(rows, indent=2))
+          PY
+      - name: Native Rust 1.89 diagnostic (failure is evidence, not compatibility)
+        if: runner.os == 'macOS'
+        run: |
+          for variant in baseline candidate; do
+            set +e
+            cargo +1.89.0 check --manifest-path "$variant/native/Cargo.toml" --locked --offline > "evidence/$variant/native-check-1.89.txt" 2>&1
+            result=$?
+            set -e
+            echo "$result" > "evidence/$variant/native-check-1.89.exit"
+          done
+      - uses: actions/setup-node@v4
+        if: runner.os == 'macOS'
+        with:
+          node-version: 24
+      - name: Native baseline and dependency-only candidate size (same flags, no new API)
+        if: runner.os == 'macOS'
+        run: |
+          for variant in baseline candidate; do
+            (cd "$variant/native" && npx --yes @tauri-apps/cli@2.12.4 icon icon.svg)
+            cargo +1.99.1 build --manifest-path "$variant/native/Cargo.toml" --release --locked --offline > "evidence/$variant/native-build.txt" 2>&1
+          done
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          rows = {v: (Path(v) / 'native/target/release/orquesta-desktop').stat().st_size for v in ('baseline', 'candidate')}
+          rows.update(delta=rows['candidate']-rows['baseline'], flags='cargo +1.99.1 build --release --locked --offline; default release profile; no RUSTFLAGS override', limitation='No candidate API call in native; linker may discard unused bundled database. Core retained-code probe is separate.')
+          Path('evidence/native-size.json').write_text(json.dumps(rows, indent=2))
+          PY
+      - name: Verify tracked production files unchanged
+        if: always()
+        run: git diff --exit-code -- Cargo.toml Cargo.lock crates/orquesta-orchestration/Cargo.toml native/Cargo.toml native/Cargo.lock LICENSE THIRD_PARTY_NOTICES.md README.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jiff-proof-${{ matrix.os }}-${{ github.sha }}
+          path: evidence/
+          if-no-files-found: error
