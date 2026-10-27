@@ -30,7 +30,9 @@ fn dispatch(runtime: &Runtime, request: DesktopRequest) -> Result<Value, String>
     let operation = match request {
         DesktopRequest::AddProject {} => return Err("Native picker required".into()),
         DesktopRequest::Sidebar {} => return sidebar_value(runtime.0.sidebar_snapshot()),
-        DesktopRequest::SidebarPreference { revision, patch } => return sidebar_value(runtime.0.sidebar_preference(revision, patch)),
+        DesktopRequest::SidebarPreference { revision, patch } => {
+            return sidebar_value(runtime.0.sidebar_preference(revision, patch));
+        }
         DesktopRequest::Inbox {} => Operation::Inbox {
             recipient: Some(RECIPIENT.into()),
         },
@@ -62,7 +64,9 @@ fn dispatch(runtime: &Runtime, request: DesktopRequest) -> Result<Value, String>
     }
     Ok(result)
 }
-fn sidebar_value(result: orquesta_orchestration::Result<impl serde::Serialize>) -> Result<Value, String> {
+fn sidebar_value(
+    result: orquesta_orchestration::Result<impl serde::Serialize>,
+) -> Result<Value, String> {
     let snapshot = result.map_err(|error| error.to_string())?;
     serde_json::to_value(snapshot).map_err(|error| error.to_string())
 }
@@ -176,14 +180,26 @@ mod tests {
         assert_eq!(inbox.as_array().unwrap().len(), 1);
         let sidebar = dispatch(&runtime, DesktopRequest::Sidebar {}).unwrap();
         assert_eq!(sidebar["projects"], json!([]));
-        runtime.0.sidebar_add_project(Some(directory.clone())).unwrap();
+        runtime
+            .0
+            .sidebar_add_project(Some(directory.clone()))
+            .unwrap();
         let sidebar = dispatch(&runtime, DesktopRequest::Sidebar {}).unwrap();
         let selected = sidebar["projects"][0]["workspace_id"].as_str().unwrap();
-        dispatch(&runtime, DesktopRequest::SidebarPreference {
-            revision: sidebar["revision"].as_u64().unwrap(),
-            patch: Preference::Select { workspace_id: selected.into() },
-        }).unwrap();
-        assert_eq!(dispatch(&runtime, DesktopRequest::Inbox {}).unwrap()[0]["read"], false);
+        dispatch(
+            &runtime,
+            DesktopRequest::SidebarPreference {
+                revision: sidebar["revision"].as_u64().unwrap(),
+                patch: Preference::Select {
+                    workspace_id: selected.into(),
+                },
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            dispatch(&runtime, DesktopRequest::Inbox {}).unwrap()[0]["read"],
+            false
+        );
         dispatch(&runtime, DesktopRequest::Read {}).unwrap();
         assert_eq!(
             dispatch(&runtime, DesktopRequest::Reconnect {}).unwrap()[0]["id"],

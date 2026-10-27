@@ -29,7 +29,13 @@
     await new Promise(resolve => setTimeout(resolve, 2200));
     const after = [draft.value, draft.selectionStart, draft.selectionEnd, draft.selectionDirection, document.activeElement];
     if (draft !== document.querySelector('#draft') || before.some((value, index) => value !== after[index]) || document.querySelector('#submissions').value !== '0') throw new Error('Draft changed');
-    await invoke('smoke_complete', { success: true, detail: 'WKWebView invoke, persistence, rejection and draft checks passed; no live mail delivery or PTY proof.' });
+    const pick = () => Promise.race([call({ kind: 'add_project' }), new Promise((_, reject) => setTimeout(() => reject(new Error('Native picker automation timed out; inspect picker-driver.log')), 20000))]);
+    if (await pick() !== null) throw new Error('Cancel changed catalog');
+    const chosen = await pick();
+    if (!chosen.projects.some(project => project.label === 'orquesta-picked-folder' && project.kind === 'folder')) throw new Error('Native selected folder missing');
+    const restart = await call({ kind: 'sidebar' });
+    if (JSON.stringify(chosen) !== JSON.stringify(restart)) throw new Error('Native catalog not persisted');
+    await invoke('smoke_complete', { success: true, detail: 'WKWebView invoke, native picker cancel/selection, persistence, rejection and draft checks passed; no live mail delivery or PTY proof.' });
   } catch (error) {
     await invoke('smoke_complete', { success: false, detail: String(error) });
   }
