@@ -49,10 +49,8 @@ fn dispatch(runtime: &Runtime, request: DesktopRequest) -> Result<Value, String>
         .call(operation)
         .map_err(|error| error.to_string())?
         .result;
-    if let Some(object) = result.as_object_mut()
-        && object.contains_key("snapshot")
-    {
-        object.insert("refresh_providers".into(), json!([]));
+    if result.get("snapshot").is_some() {
+        result["refresh_providers"] = json!([]);
     }
     Ok(result)
 }
