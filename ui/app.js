@@ -1,24 +1,31 @@
 // Copyright (c) 2026 Lovecast Inc. SPDX-License-Identifier: MIT
 const element = id => document.getElementById(id);
 const recipient = 'session:s';
-const preference = `orquesta:${recipient}:`;
-const safety = element('safety');
-let connected = true;
-let signature = '';
-let known = new Set();
-let pending = false;
+const preference = `orquesta:host:${location.host}:`;
+const safety = element('safety'), inbox = element('inbox'), settings = element('settingsdialog');
+const mobile = matchMedia('(max-width: 700px)');
+const rows = new Map();
+let connected = true, pending = false, generation = 0;
 safety.checked = localStorage.getItem(preference + 'notifications') !== 'false';
-safety.addEventListener('change', () => localStorage.setItem(preference + 'notifications', safety.checked));
+safety.onchange = () => localStorage.setItem(preference + 'notifications', safety.checked);
 function theme(value) {
   document.documentElement.dataset.theme = value;
-  element('theme').textContent = `Theme: ${value === 'dark' ? 'Dark' : 'Light'}`;
+  element('theme').textContent = `Dev: Theme ${value === 'dark' ? 'Dark' : 'Light'}`;
 }
 theme(localStorage.getItem(preference + 'theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
-element('theme').addEventListener('click', () => {
+element('theme').onclick = () => {
   const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
   theme(next);
   localStorage.setItem(preference + 'theme', next);
-});
+};
+function layout() { inbox.close(); if (!mobile.matches) inbox.show(); element('inbox-toggle').setAttribute('aria-expanded', String(inbox.open)); }
+layout();
+mobile.onchange = layout;
+element('inbox-toggle').onclick = () => { if (inbox.open) inbox.close(); else if (mobile.matches) inbox.showModal(); else inbox.show(); element('inbox-toggle').setAttribute('aria-expanded', String(inbox.open)); };
+element('inbox-close').onclick = () => inbox.close();
+inbox.onclose = () => { element('inbox-toggle').setAttribute('aria-expanded', String(inbox.open)); if (!inbox.open) element('inbox-toggle').focus(); };
+document.querySelectorAll('a[href="#settingsdialog"]').forEach(link => { link.onclick = event => { event.preventDefault(); settings.showModal(); }; });
+element('settings-close').onclick = () => settings.close();
 async function ipc(command, fields = {}) {
   const response = await fetch('/ipc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: 1, operation: { command, recipient, ...fields } }) });
   const data = await response.json();
@@ -31,82 +38,71 @@ function text(tag, content, className) {
   if (className) node.className = className;
   return node;
 }
-function render(messages) {
-  const next = JSON.stringify(messages);
-  if (signature === next) return;
-  signature = next;
-  const list = element('messages');
-  const focused = list.contains(document.activeElement) ? document.activeElement.closest('[data-id]')?.dataset.id : null;
-  const rows = messages.sort((a, b) => a.id - b.id).map(message => {
-    const row = document.createElement('li');
-    row.className = 'message';
-    row.tabIndex = -1;
-    row.dataset.id = message.id;
-    const meta = text('div', '', 'meta');
-    meta.append(text('span', `${message.envelope.from} · #${message.id}`), text('span', message.acknowledged ? 'Acknowledged' : message.read ? 'Read' : 'Unread', 'state'));
-    row.append(meta, text('h3', message.envelope.subject), text('p', message.envelope.body, 'body'));
-    const ack = text('button', message.acknowledged ? 'Acknowledged' : 'Acknowledge');
-    ack.type = 'button';
-    ack.dataset.ack = message.id;
-    ack.disabled = message.acknowledged;
-    ack.setAttribute('aria-label', `Acknowledge message ${message.id}`);
-    ack.addEventListener('click', () => act('ack', { id: message.id }));
-    row.append(ack);
-    return row;
+function times() {
+  document.querySelectorAll('[data-created]').forEach(node => {
+    const seconds = Number(node.dataset.created), elapsed = Math.max(0, Math.floor(Date.now() / 1000 - seconds));
+    node.textContent = !seconds ? 'Time unavailable' : elapsed < 60 ? 'just now' : `${Math.floor(elapsed / 60)} m ago`;
   });
-  if (!rows.length) rows.push(text('li', 'Inbox is clear. Incoming messages will appear here, never in your draft.', 'empty'));
-  list.replaceChildren(...rows);
-  if (focused) {
-    const button = list.querySelector(`[data-ack="${focused}"]`);
-    if (button && document.activeElement === document.body) (button.disabled ? button.closest('li') : button).focus();
+}
+function render(messages) {
+  let arrivals = 0;
+  for (const message of messages.sort((a, b) => a.id - b.id)) {
+    let row = rows.get(message.id);
+    if (!row) { row = text('li', '', 'message'); row.dataset.id = message.id; row.tabIndex = -1; rows.set(message.id, row); element('messages').append(row); arrivals++; }
+    if (row.signature === JSON.stringify(message)) continue;
+    row.signature = JSON.stringify(message);
+    const focused = row.contains(document.activeElement);
+    row.className = `message${!message.read && !message.acknowledged ? ' unread' : ''}`;
+    const state = text('span', message.acknowledged ? 'Acknowledged' : message.read ? 'Read' : 'Unread', 'state');
+    const meta = text('div', '', 'meta'), date = text('time', '');
+    date.dataset.created = message.created_at || 0;
+    if (message.created_at) date.dateTime = date.title = new Date(message.created_at * 1000).toISOString();
+    const sender = { run: 'Coordinator', dispatch: 'Worker', session: 'Terminal' }[message.envelope.from.split(':')[0]] || 'Sender';
+    meta.append(text('strong', sender), text('span', message.envelope.from), date);
+    row.replaceChildren(state, text('h3', message.envelope.subject), meta, text('p', message.envelope.body, 'body'));
+    if (!message.acknowledged) {
+      const ack = text('button', 'Acknowledge');
+      ack.type = 'button'; ack.dataset.ack = message.id; ack.setAttribute('aria-label', `Acknowledge message ${message.id}`);
+      ack.onclick = () => act('ack', { id: message.id }); row.append(ack);
+    }
+    if (focused && document.activeElement === document.body) (row.querySelector('button') || row).focus();
   }
   const unread = messages.filter(message => !message.read && !message.acknowledged).length;
-  element('badge').textContent = unread;
-  element('read-batch').disabled = !unread;
-  const arrivals = messages.filter(message => !known.has(message.id)).length;
-  if (safety.checked && arrivals) element('notice').textContent = `${arrivals} new inbox ${arrivals === 1 ? 'message' : 'messages'}. Your draft is unchanged.`;
-  else element('notice').textContent = safety.checked ? 'Inbox is up to date.' : 'Inbox notifications are paused.';
-  known = new Set(messages.map(message => message.id));
+  element('badge').textContent = unread; element('badge').hidden = !unread;
+  element('inbox-toggle').setAttribute('aria-label', unread ? `Inbox, ${unread} unread` : 'Inbox');
+  element('read-batch').disabled = !unread; element('empty').hidden = !!messages.length;
+  if (arrivals && safety.checked) element('notice').textContent = `${arrivals} new inbox ${arrivals === 1 ? 'message' : 'messages'}.`;
+  times();
 }
+function failure(error) { element('status').textContent = `Error: ${error.message}`; element('retry').hidden = false; }
 async function refresh() {
   if (!connected || pending) return;
   pending = true;
+  const current = generation;
   try {
     const messages = await ipc('inbox');
-    if (!connected) return;
-    render(messages);
-    element('status').textContent = 'Local mailbox · connected';
-  }
-  catch (error) { if (connected) element('status').textContent = error.message; }
+    if (!connected || generation !== current) return;
+    render(messages); element('status').textContent = 'Connected'; element('retry').hidden = true;
+    const date = new Date(); element('last-good').dateTime = element('last-good').title = date.toISOString(); element('last-good').textContent = `Last synced ${date.toLocaleTimeString()}`;
+  } catch (error) { if (connected && generation === current) failure(error); }
   finally { pending = false; }
 }
 async function act(command, fields) {
-  try { await ipc(command, fields); await refresh(); }
-  catch (error) { element('status').textContent = error.message; }
+  const current = generation;
+  try { await ipc(command, fields); if (connected && generation === current) await refresh(); }
+  catch (error) { if (connected && generation === current) failure(error); }
 }
-element('read-batch').addEventListener('click', () => act('check', { peek: false }));
-element('connection').addEventListener('click', async () => {
-  connected = !connected;
-  element('connection').textContent = connected ? 'Disconnect' : 'Reconnect';
-  element('status').textContent = connected ? 'Reconnecting…' : 'Local mailbox · disconnected';
-  if (connected) await act('check', { peek: false });
-});
-element('inbox-toggle').addEventListener('click', () => {
-  const drawer = element('inbox');
-  drawer.hidden = !drawer.hidden;
-  element('inbox-toggle').setAttribute('aria-expanded', String(!drawer.hidden));
-});
-document.addEventListener('keydown', event => {
-  if (event.key === 'Escape') {
-    element('settings').open = false;
-    if (element('inbox').contains(document.activeElement)) element('inbox-toggle').focus();
-    element('inbox').hidden = true;
-    element('inbox-toggle').setAttribute('aria-expanded', 'false');
-  }
-});
-element('composer').addEventListener('submit', event => {
-  event.preventDefault();
-  element('submissions').value = Number(element('submissions').value) + 1;
-});
+async function reconnect() {
+  connected = true; generation++;
+  element('connection').textContent = 'Disconnect'; element('status').textContent = 'Reconnecting…';
+  await act('check', { peek: false });
+}
+element('read-batch').onclick = () => act('check', { peek: false });
+element('retry').onclick = reconnect;
+element('connection').onclick = () => {
+  if (!connected) return reconnect();
+  connected = false; generation++; element('connection').textContent = 'Reconnect'; element('status').textContent = 'Disconnected'; element('retry').hidden = false;
+};
+element('composer').onsubmit = event => { event.preventDefault(); element('submissions').value = Number(element('submissions').value) + 1; };
 refresh();
-setInterval(refresh, 1000);
+setInterval(() => { times(); refresh(); }, 1000);

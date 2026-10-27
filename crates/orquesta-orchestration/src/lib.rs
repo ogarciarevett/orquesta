@@ -28,6 +28,8 @@ pub struct Envelope {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Message {
     pub id: u64,
+    #[serde(default)]
+    pub created_at: u64,
     pub envelope: Envelope,
     pub read: bool,
     pub acknowledged: bool,
@@ -118,6 +120,9 @@ impl Mailbox {
             }
             let message = Message {
                 id: state.messages.len() as u64 + 1,
+                created_at: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs(),
                 envelope,
                 read: false,
                 acknowledged: false,

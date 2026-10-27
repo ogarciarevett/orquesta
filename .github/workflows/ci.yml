@@ -24,3 +24,8 @@ jobs:
           node-version: 22
       - run: npx --yes agent-browser@0.39.4 install --with-deps
       - run: python3 ui/test_ui.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: inbox-ui-screenshots
+          path: artifacts/inbox-ui/*.png
