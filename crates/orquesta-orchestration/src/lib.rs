@@ -21,6 +21,8 @@ pub struct Envelope {
     pub subject: String,
     pub body: String,
     pub thread: Option<u64>,
+    #[serde(default)]
+    pub metadata: std::collections::BTreeMap<String, serde_json::Value>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -134,11 +136,16 @@ impl Mailbox {
 
     pub fn check(&self, recipient: &str, peek: bool) -> Result<Vec<Message>> {
         self.transaction(|state| {
+            let replay = state
+                .messages
+                .iter()
+                .any(|m| m.envelope.to == recipient && m.read && !m.acknowledged);
             let mut messages = Vec::new();
             for message in &mut state.messages {
                 if message.envelope.to == recipient
                     && !message.acknowledged
                     && (!peek || !message.read)
+                    && (peek || !replay || message.read)
                 {
                     messages.push(message.clone());
                     if !peek {
@@ -177,6 +184,7 @@ impl Mailbox {
             subject: original.envelope.subject,
             body: body.into(),
             thread: Some(id),
+            metadata: Default::default(),
         })
     }
 }
