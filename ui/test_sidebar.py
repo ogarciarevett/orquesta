@@ -59,8 +59,12 @@ class SidebarUI(unittest.TestCase):
             if width == 375:
                 browser('click', '#projects-toggle')
                 self.assertTrue(evaluate("document.querySelector('#projects').matches(':modal')"))
+                print('MODAL BEFORE COVERED FOCUS', evaluate("({modal: document.querySelector('#projects').matches(':modal'), active: document.activeElement.outerHTML})"), flush=True)
+                evaluate("document.querySelector('#draft').focus()")
+                print('COVERED FOCUS ATTEMPT', evaluate("({modal: document.querySelector('#projects').matches(':modal'), active: document.activeElement.outerHTML})"), flush=True)
                 for _ in range(8):
                     browser('press', 'Tab')
+                    print('TAB TARGET', _, evaluate("({modal: document.querySelector('#projects').matches(':modal'), activeTag: document.activeElement.tagName, activeId: document.activeElement.id, inside: document.querySelector('#projects').contains(document.activeElement)})"), flush=True)
                     self.assertTrue(evaluate("document.querySelector('#projects').contains(document.activeElement)"))
                 self.assertEqual(evaluate("document.querySelector('#projects').getBoundingClientRect().bottom"), evaluate("document.querySelector('#status-bar').getBoundingClientRect().top"))
             for theme in ['light', 'dark']:
