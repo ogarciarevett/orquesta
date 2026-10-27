@@ -147,7 +147,7 @@ def verify_status_bar(test, browser, evaluate, ipc):
             rpc(dict(action='visibility', key=entry['id'], visible=index<3))
         browser('set', 'viewport', '1280', '900')
         browser('screenshot', '/tmp/orquesta-status-layout.png')
-        browser('wait', '--fn', "document.querySelector('#sb-overflow').hidden")
+        browser('wait', '--fn', "document.querySelector('#sb-overflow').hidden && document.querySelector('#status-bar').dataset.density === 'detailed' && document.querySelectorAll('.sb-provider:not([hidden])').length === 3")
         test.assertEqual(evaluate("[...document.querySelectorAll('.sb-provider:not([hidden])>.sb-meter')].map(m=>[m.offsetWidth,m.offsetHeight])"), [[48,6]]*3)
         for theme in ['light', 'dark']:
             if evaluate('document.documentElement.dataset.theme') != theme:
