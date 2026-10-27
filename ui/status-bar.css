@@ -1,0 +1,47 @@
+/* Copyright (c) 2026 Lovecast Inc. Copyright (c) 2026 Omar Garcia. SPDX-License-Identifier: MIT */
+:root { --bg-titlebar: var(--surface); --sb-off: #697269; --status-warning: #875300; --destructive: #b3261e; --sb-meter: #687776; --sb-track: #d4d9d3; }
+:root[data-theme="dark"] { --sb-off: #a6b4b1; --status-warning: #f7c66b; --destructive: #ffaba5; --sb-meter: #a4b2af; --sb-track: #425352; }
+body { padding-bottom: 24px; }
+#status-bar { position: fixed; inset: auto 0 0; height: 24px; padding: 0 12px; display: flex; align-items: center; gap: 16px; border-top: 1px solid var(--line); background: var(--bg-titlebar); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; z-index: 2; }
+#status-bar button { display: inline-flex; align-items: center; gap: 4px; height: 20px; min-height: 20px; padding: 0 2px; border: 0; background: transparent; border-radius: 2px; font: inherit; white-space: nowrap; }
+#status-bar button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+#sb-providers { display: flex; flex: 1; min-width: 0; gap: 12px; align-items: center; }
+#sb-segments { display: flex; flex: none; gap: 12px; }
+.sb-warning { color: var(--muted); }
+.sb-letter { display: inline-block; color: var(--muted); }
+.sb-indicator { width: 12px; flex: none; color: var(--muted); }
+.sb-meter { display: inline-block; width: 48px; height: 6px; background: var(--sb-track); border-radius: 4px; overflow: hidden; flex: none; }
+.sb-meter i { display: block; height: 100%; background: var(--sb-meter); }
+.sb-window { display: inline-flex; gap: 6px; align-items: center; }
+.sb-window + .sb-window::before { content: "·"; color: var(--muted); }
+.sb-number[data-tone="warning"] { color: var(--status-warning); }
+.sb-number[data-tone="urgent"] { color: var(--destructive); }
+#status-bar [data-phase="loading"] { color: var(--muted); }
+#status-bar [data-phase="off"] { color: var(--sb-off); }
+#status-bar:not([data-density="detailed"]) .sb-meter, #status-bar[data-density="tight"] .sb-window:not(.sb-tight), #status-bar[data-density="fold"] .sb-window:not(.sb-tight), #status-bar[data-density="icons"] .sb-window:not(.sb-tight) { display: none; }
+#status-bar[data-density="icons"] .sb-segment-name, #status-bar[data-density="icons"] .sb-window-label, #status-bar[data-density="icons"] [data-phase="error_no_cache"] .sb-state { display: none; }
+#sb-segments svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; flex: none; }
+#sb-usage, #sb-menu { position: fixed; inset: auto auto 32px 12px; width: min(430px, calc(100vw - 24px)); max-height: min(70dvh, 650px); margin: 0; padding: 14px; overflow: auto; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; font-size: 12px; }
+#sb-menu { left: auto; right: 12px; width: min(350px, calc(100vw - 24px)); }
+#sb-usage header { display: flex; align-items: center; gap: 10px; }
+#sb-usage h2 { flex: 1; }
+.sb-row { border-bottom: 1px solid var(--line); padding: 12px 0; }
+.sb-row > strong { margin-right: 8px; }
+.sb-plan { color: var(--muted); }
+.sb-row .sb-window { display: flex; flex-wrap: wrap; }
+.sb-controls label { display: flex; align-items: center; gap: 8px; min-height: 36px; font-size: 12px; }
+#sb-settings { width: min(480px, calc(100vw - 24px)); max-height: 90dvh; }
+#sb-details { width: min(440px, calc(100vw - 24px)); }
+#sb-details form, #sb-settings form { text-align: right; }
+.sb-refreshing:not(button), #sb-refresh.sb-refreshing .sb-refresh-symbol { display: inline-block; animation: sb-turn 1s linear infinite; }
+.sb-refresh-symbol { display: inline-block; width: 1em; }
+@keyframes sb-turn { to { transform: rotate(360deg); } }
+.sb-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+@media (max-width: 500px) { body { padding-bottom: 44px; } #status-bar { height: 44px; } #status-bar button { min-width: 24px; min-height: 44px; } #sb-usage, #sb-menu { bottom: 52px; } .sb-controls label { min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .sb-refreshing { animation: none; } }
+
+.sb-letter::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; background: currentColor; }
+#status-bar .sb-overflow { border: 1px solid var(--line); border-radius: 8px; padding-inline: 5px; }
+.sb-overflow[data-tone="warning"] { color: var(--status-warning); }
+.sb-overflow[data-tone="urgent"] { color: var(--destructive); }
+.sb-controls small { color: var(--muted); background: none; }

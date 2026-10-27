@@ -21,11 +21,27 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       - run: npx --yes agent-browser@0.39.4 install --with-deps
+      - uses: actions/checkout@v4
+        with:
+          repository: stablyai/orca
+          ref: 1d1c6da582e1bf76c188ff44e5f11ca05fb350e4
+          path: .orca-reference
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+      - run: pnpm --dir .orca-reference install --frozen-lockfile --ignore-scripts
       - run: python3 ui/test_ui.py
+        env:
+          ORCA_REFERENCE_ROOT: ${{ github.workspace }}/.orca-reference
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: inbox-ui-screenshots
           path: artifacts/inbox-ui/*.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: status-bar-comparison
+          path: /tmp/orquesta-ui-shots/
