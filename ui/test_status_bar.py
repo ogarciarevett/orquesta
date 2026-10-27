@@ -29,12 +29,14 @@ def verify_checkbox_poll_focus(test, browser, evaluate, ipc, selector):
         for step, marker in enumerate(markers):
             rpc(dict(action='inventory', kind='terminals', id=marker, present=True))
             browser('wait', '--fn', f"document.querySelector('#sb-terminals').ariaLabel === '{baseline + step + 1} terminals'")
-            test.assertTrue(evaluate(f"document.querySelector({json.dumps(selector)}) === window.focusControl && document.activeElement === window.focusControl"))
+            ownership = evaluate(f"({{sameNode: document.querySelector({json.dumps(selector)}) === window.focusControl, focusRetained: document.activeElement === window.focusControl, activeId: document.activeElement.id || document.activeElement.tagName}})")
+            test.assertTrue(ownership['sameNode'], ownership)
+            test.assertTrue(ownership['focusRetained'], ownership)
             test.assertEqual(evaluate('window.focusControl.checked'), initial if step == 0 else not initial)
             print(f'{selector}: successful poll marker {step + 1} rendered with focus intact', flush=True)
             if step == 0:
                 browser('press', 'Space')
-                browser('wait', '--fn', f"!window.focusControl.disabled && window.focusControl.checked === {str(not initial).lower()}")
+                browser('wait', '--fn', f"!window.focusControl.disabled && !window.focusControl.hasAttribute('aria-disabled') && window.focusControl.checked === {str(not initial).lower()}")
                 test.assertEqual(rpc(dict(action='snapshot'))['snapshot']['visibility']['claude'], not initial)
                 print(f'{selector}: Space persisted checked={not initial}', flush=True)
         return not initial
