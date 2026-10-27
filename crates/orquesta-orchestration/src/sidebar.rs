@@ -118,7 +118,11 @@ impl Mailbox {
             }
             match patch {
                 Preference::Select { workspace_id } => {
-                    if !catalog.folders.iter().any(|f| f.workspace_id == workspace_id) {
+                    if !catalog
+                        .folders
+                        .iter()
+                        .any(|f| f.workspace_id == workspace_id)
+                    {
                         return Err(invalid("unknown workspace"));
                     }
                     catalog.selected = Some(workspace_id);
@@ -152,7 +156,10 @@ mod tests {
         let folder = root.join("日本語 project");
         fs::create_dir_all(&folder)?;
         let mailbox = Mailbox::open(&directory)?;
-        fs::write(directory.join("mailbox.json"), br#"{"recipients":[],"messages":[]}"#)?;
+        fs::write(
+            directory.join("mailbox.json"),
+            br#"{"recipients":[],"messages":[]}"#,
+        )?;
         assert!(mailbox.sidebar_snapshot()?.projects.is_empty());
         mailbox.register("session:s")?;
         mailbox.send(Envelope {
@@ -165,19 +172,35 @@ mod tests {
             thread: None,
             metadata: Default::default(),
         })?;
-        mailbox.status_bar(Action::Visibility { key: "ports".into(), visible: false })?;
+        mailbox.status_bar(Action::Visibility {
+            key: "ports".into(),
+            visible: false,
+        })?;
         let bytes = fs::read(directory.join("mailbox.json"))?;
         assert!(mailbox.sidebar_add_project(None)?.is_none());
         assert_eq!(bytes, fs::read(directory.join("mailbox.json"))?);
-        assert!(mailbox.sidebar_add_project(Some(directory.join("missing"))).is_err());
-        assert!(mailbox.sidebar_add_project(Some(directory.join("mailbox.json"))).is_err());
+        assert!(
+            mailbox
+                .sidebar_add_project(Some(directory.join("missing")))
+                .is_err()
+        );
+        assert!(
+            mailbox
+                .sidebar_add_project(Some(directory.join("mailbox.json")))
+                .is_err()
+        );
         let snapshot = mailbox.sidebar_add_project(Some(folder.clone()))?.unwrap();
         assert_eq!(snapshot.projects[0].kind, "folder");
         assert_eq!(snapshot.projects[0].label, "日本語 project");
         let projection = serde_json::to_string(&snapshot)?;
         assert!(!projection.contains("root"));
         assert!(!projection.contains(root.to_str().unwrap()));
-        assert_eq!(snapshot, mailbox.sidebar_add_project(Some(folder.join(".")))?.unwrap());
+        assert_eq!(
+            snapshot,
+            mailbox
+                .sidebar_add_project(Some(folder.join(".")))?
+                .unwrap()
+        );
         #[cfg(unix)]
         {
             let alias = root.join("alias");
@@ -185,18 +208,67 @@ mod tests {
             assert_eq!(snapshot, mailbox.sidebar_add_project(Some(alias))?.unwrap());
         }
         let selected = snapshot.projects[0].workspace_id.clone();
-        let snapshot = mailbox.sidebar_preference(snapshot.revision, Preference::Select { workspace_id: selected.clone() })?;
-        let snapshot = mailbox.sidebar_preference(snapshot.revision, Preference::Collapse { id: "local".into(), collapsed: true })?;
-        let snapshot = mailbox.sidebar_preference(snapshot.revision, Preference::Collapse { id: snapshot.projects[0].id.clone(), collapsed: true })?;
+        let snapshot = mailbox.sidebar_preference(
+            snapshot.revision,
+            Preference::Select {
+                workspace_id: selected.clone(),
+            },
+        )?;
+        let snapshot = mailbox.sidebar_preference(
+            snapshot.revision,
+            Preference::Collapse {
+                id: "local".into(),
+                collapsed: true,
+            },
+        )?;
+        let snapshot = mailbox.sidebar_preference(
+            snapshot.revision,
+            Preference::Collapse {
+                id: snapshot.projects[0].id.clone(),
+                collapsed: true,
+            },
+        )?;
         assert_eq!(snapshot.selected, Some(selected));
-        assert!(mailbox.sidebar_preference(0, Preference::Select { workspace_id: "foreign".into() }).is_err());
-        assert!(mailbox.sidebar_preference(snapshot.revision, Preference::Collapse { id: "foreign".into(), collapsed: true }).is_err());
+        assert!(
+            mailbox
+                .sidebar_preference(
+                    0,
+                    Preference::Select {
+                        workspace_id: "foreign".into()
+                    }
+                )
+                .is_err()
+        );
+        assert!(
+            mailbox
+                .sidebar_preference(
+                    snapshot.revision,
+                    Preference::Collapse {
+                        id: "foreign".into(),
+                        collapsed: true
+                    }
+                )
+                .is_err()
+        );
         let reopened = Mailbox::open(&directory)?;
         assert_eq!(snapshot, reopened.sidebar_snapshot()?);
         assert!(!reopened.inbox(Some("session:s"))?[0].read);
-        assert_eq!(reopened.status_bar(Action::Snapshot)?["snapshot"]["visibility"]["ports"], false);
+        assert_eq!(
+            reopened.status_bar(Action::Snapshot)?["snapshot"]["visibility"]["ports"],
+            false
+        );
         fs::create_dir(directory.join("mailbox.pending"))?;
-        assert!(reopened.sidebar_preference(snapshot.revision, Preference::Collapse { id: "local".into(), collapsed: false }).is_err());
+        assert!(
+            reopened
+                .sidebar_preference(
+                    snapshot.revision,
+                    Preference::Collapse {
+                        id: "local".into(),
+                        collapsed: false
+                    }
+                )
+                .is_err()
+        );
         fs::remove_dir(directory.join("mailbox.pending"))?;
         assert_eq!(snapshot, reopened.sidebar_snapshot()?);
         fs::write(directory.join("mailbox.json"), "corrupt")?;

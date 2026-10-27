@@ -214,5 +214,5 @@ mod tests;
 
 pub mod composer;
 pub mod runtime;
-pub mod status_bar;
 pub mod sidebar;
+pub mod status_bar;
