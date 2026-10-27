@@ -19,6 +19,15 @@
   toggle.onclick = () => { sheet(panel.hidden); if (!panel.hidden) get('add-project').focus(); };
   get('projects-close').onclick = () => sheet(false, true);
   panel.oncancel = event => { event.preventDefault(); sheet(false, true); };
+  panel.onkeydown = event => {
+    if (event.key !== 'Tab' || !narrow.matches) return;
+    const targets = [...panel.querySelectorAll('button')].filter(node => node.checkVisibility());
+    const index = targets.indexOf(document.activeElement);
+    if ((event.shiftKey && index <= 0) || (!event.shiftKey && index === targets.length - 1)) {
+      event.preventDefault();
+      targets[event.shiftKey ? targets.length - 1 : 0]?.focus();
+    }
+  };
   narrow.onchange = layout;
   layout();
   function button(label, id, action) {
