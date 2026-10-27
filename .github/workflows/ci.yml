@@ -24,6 +24,7 @@ jobs:
           node-version: 24
       - run: npx --yes agent-browser@0.39.4 install --with-deps
       - run: python3 -m unittest discover -s ui -p test_focus.py -v
+      - run: python3 -m unittest discover -s ui -p test_sidebar.py -v
       - uses: actions/checkout@v4
         with:
           repository: stablyai/orca

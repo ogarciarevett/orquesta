@@ -3,15 +3,20 @@ use orquesta_orchestration::{
     Mailbox,
     runtime::{Operation, Runtime},
     status_bar::{Action, DisplayMode},
+    sidebar::Preference,
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
 use tauri::Manager;
+use tauri_plugin_dialog::DialogExt;
 
 const RECIPIENT: &str = "session:s";
 #[derive(Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 enum DesktopRequest {
+    AddProject {},
+    Sidebar {},
+    SidebarPreference { revision: u64, patch: Preference },
     Inbox {},
     Read {},
     Reconnect {},
@@ -23,6 +28,9 @@ enum DesktopRequest {
 }
 fn dispatch(runtime: &Runtime, request: DesktopRequest) -> Result<Value, String> {
     let operation = match request {
+        DesktopRequest::AddProject {} => return Err("Native picker required".into()),
+        DesktopRequest::Sidebar {} => return runtime.0.sidebar_snapshot().and_then(|s| Ok(serde_json::to_value(s)?)).map_err(|e| e.to_string()),
+        DesktopRequest::SidebarPreference { revision, patch } => return runtime.0.sidebar_preference(revision, patch).and_then(|s| Ok(serde_json::to_value(s)?)).map_err(|e| e.to_string()),
         DesktopRequest::Inbox {} => Operation::Inbox {
             recipient: Some(RECIPIENT.into()),
         },
@@ -63,7 +71,16 @@ async fn desktop_request(
     if window.label() != "main" || !local_url(&window.url().map_err(|error| error.to_string())?) {
         return Err("Untrusted desktop caller".into());
     }
-    tauri::async_runtime::spawn_blocking(move || dispatch(app.state::<Runtime>().inner(), request))
+    tauri::async_runtime::spawn_blocking(move || {
+        if matches!(request, DesktopRequest::AddProject {}) {
+            let selected = app.dialog().file().set_parent(&window).set_title("Add project")
+                .set_can_create_directories(false).blocking_pick_folder()
+                .map(|path| path.into_path()).transpose().map_err(|e| e.to_string())?;
+            return app.state::<Runtime>().0.sidebar_add_project(selected)
+                .and_then(|s| Ok(serde_json::to_value(s)?)).map_err(|e| e.to_string());
+        }
+        dispatch(app.state::<Runtime>().inner(), request)
+    })
         .await
         .map_err(|error| error.to_string())?
 }
@@ -81,7 +98,7 @@ fn smoke_complete(app: tauri::AppHandle, success: bool, detail: String) {
     app.exit(if success { 0 } else { 1 });
 }
 fn main() {
-    let builder = tauri::Builder::default();
+    let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
     #[cfg(feature = "native-smoke")]
     let builder = builder.invoke_handler(tauri::generate_handler![desktop_request, smoke_complete]);
     #[cfg(not(feature = "native-smoke"))]
@@ -177,6 +194,9 @@ mod tests {
     #[test]
     fn rejects_webview_authority_expansion() {
         for input in [
+            r#"{"kind":"add_project","path":"/tmp"}"#,
+            r#"{"kind":"sidebar_preference","revision":0,"patch":{"action":"select","workspace_id":"folder-1","path":"/tmp"}}"#,
+            r#"{"kind":"sidebar","executable":"git"}"#,
             r#"{"kind":"send"}"#,
             r#"{"kind":"inbox","recipient":"session:other"}"#,
             r#"{"kind":"status","path":"/tmp"}"#,

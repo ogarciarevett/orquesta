@@ -30,7 +30,7 @@ class FocusUI(unittest.TestCase):
             self.fail('Focus UI host failed to start')
         SHOTS.mkdir(parents=True, exist_ok=True)
         browser('open', URL)
-        browser('set', 'viewport', '1280', '900')
+        browser('set', 'viewport', '1400', '900')
         browser('wait', '--fn', "document.querySelector('#status').textContent === 'Connected' && !!document.querySelector('#sb-menu input[data-key=claude]')")
 
     def close_host(self):
@@ -62,12 +62,12 @@ class FocusUI(unittest.TestCase):
 
     def test_composer_survives_polls_and_both_resize_directions(self):
         before = self.prepare_draft()
-        for count, width in enumerate([699, 701, 375, 1280], 1):
+        for count, width in enumerate([1299, 1301, 375, 1400], 1):
             with self.subTest(width=width):
                 browser('focus', '#draft')
                 self.assertEqual(self.draft_state(), before)
                 browser('set', 'viewport', str(width), '900')
-                expanded = 'true' if width > 700 else 'false'
+                expanded = 'true' if width > 1300 else 'false'
                 browser('wait', '--fn', f"document.querySelector('#inbox-toggle').getAttribute('aria-expanded') === '{expanded}'")
                 envelope = dict(request_id=f'focus-{count}', to='session:s', **{'from': 'run:r'},
                                 kind='status', subject=f'Resize {width}', body='Separate inbox notice', thread=None)
@@ -100,7 +100,7 @@ class FocusUI(unittest.TestCase):
         before = self.prepare_draft()
         for count, selector in enumerate(['#inbox-close', '#messages .message'], 1):
             with self.subTest(selector=selector):
-                browser('set', 'viewport', '1280', '900')
+                browser('set', 'viewport', '1400', '900')
                 browser('wait', '--fn', "document.querySelector('#inbox').open")
                 browser('focus', selector)
                 self.assertTrue(evaluate(f"document.activeElement === document.querySelector('{selector}')"))

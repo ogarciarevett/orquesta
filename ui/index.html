@@ -5,11 +5,18 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark"><title>Orquesta · Terminal s</title>
   <link rel="stylesheet" href="style.css"><script src="native.js" defer></script><script src="app.js" type="module"></script>
+  <link rel="stylesheet" href="sidebar.css"><script src="sidebar.js" defer></script>
   <link rel="stylesheet" href="status-bar.css"><script src="status-bar.js" defer></script>
 </head>
 <body>
-  <header><a class="brand" href="/">Orquesta</a><nav aria-label="Workspace controls"><button id="theme" type="button">Dev: Theme</button><button id="inbox-toggle" type="button" aria-controls="inbox" aria-expanded="false">Inbox <span id="badge" hidden>0</span></button></nav></header>
+  <header><button id="projects-toggle" type="button" aria-controls="projects" aria-expanded="false">Projects</button><a class="brand" href="/">Orquesta</a><nav aria-label="Workspace controls"><button id="theme" type="button">Dev: Theme</button><button id="inbox-toggle" type="button" aria-controls="inbox" aria-expanded="false">Inbox <span id="badge" hidden>0</span></button></nav></header>
   <main>
+    <aside id="projects" aria-label="Projects">
+      <div class="heading"><h2>Projects</h2><button id="projects-close" type="button">Close</button></div>
+      <button id="add-project" type="button">Add project</button>
+      <p id="project-status" role="status"></p><button id="projects-retry" type="button" hidden>Retry</button>
+      <div id="project-list"></div>
+    </aside>
     <section class="terminal" aria-labelledby="terminal-title">
       <h1 id="terminal-title">Terminal s</h1>
       <form id="composer">

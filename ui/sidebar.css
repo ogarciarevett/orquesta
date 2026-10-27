@@ -1,0 +1,28 @@
+/* Copyright (c) 2026 Lovecast Inc. Copyright (c) 2026 Omar Garcia. SPDX-License-Identifier: MIT */
+:root { --worktree-sidebar: #f5f5f5; --worktree-sidebar-foreground: #0a0a0a; --worktree-sidebar-accent: #eaeaea; --worktree-sidebar-border: #e5e5e5; --worktree-sidebar-ring: #a1a1a1; }
+:root[data-theme="dark"] { --worktree-sidebar: #2a2a2a; --worktree-sidebar-foreground: #fafafa; --worktree-sidebar-accent: #353535; --worktree-sidebar-border: rgb(255 255 255 / .07); --worktree-sidebar-ring: #737373; }
+main { grid-template-columns: 280px minmax(640px, 1fr) 380px; }
+main:has(#inbox:not([open])) { grid-template-columns: 280px minmax(640px, 1fr); }
+#projects { min-width: 0; padding: 12px; background: var(--worktree-sidebar); color: var(--worktree-sidebar-foreground); border-right: 1px solid var(--worktree-sidebar-border); }
+#projects button { max-width: 100%; color: inherit; background: transparent; border-color: transparent; overflow: hidden; text-overflow: ellipsis; }
+#projects button:hover, #projects [aria-selected="true"] { background: var(--worktree-sidebar-accent); }
+#projects :focus-visible { outline-color: var(--worktree-sidebar-ring); }
+#projects h2 { font-size: 14px; }
+#projects p { font-size: 12px; overflow-wrap: anywhere; }
+.project-group, .project-folder { display: block; width: 100%; text-align: left; font-size: 13px; }
+.project-group { font-weight: 600; }
+.project-group[aria-expanded="false"]::before { content: '▸ '; }
+.project-group[aria-expanded="true"]::before { content: '▾ '; }
+.project-folder { padding-left: 20px; }
+#projects-toggle, #projects-close { display: none; }
+@media (max-width: 1300px) {
+  main, main:has(#inbox:not([open])) { grid-template-columns: 280px minmax(640px, 1fr); }
+}
+@media (max-width: 920px) {
+  main, main:has(#inbox:not([open])) { grid-template-columns: minmax(0, 1fr); }
+  body > header { height: 48px; padding: 2px 8px; gap: 4px; }
+  body > header .brand { display: none; }
+  #projects-toggle, #projects-close { display: block; }
+  #projects { position: fixed; inset: 48px 0 36px; z-index: 5; overflow-y: auto; }
+  #projects button { min-height: 44px; }
+}

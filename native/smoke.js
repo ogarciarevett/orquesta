@@ -5,7 +5,7 @@
   try {
     for (let attempt = 0; document.querySelector('#status').textContent !== 'Connected' && attempt < 50; attempt++)
       await new Promise(resolve => setTimeout(resolve, 100));
-    if (!document.querySelector('#inbox').open || document.querySelector('#status').textContent !== 'Connected') throw new Error('Native inbox UI did not initialize');
+    if (document.querySelector('#inbox').open || document.querySelector('#status').textContent !== 'Connected') throw new Error('Native inbox UI did not initialize');
     const draft = document.querySelector('#draft');
     draft.value = 'First line\nSecond line'; draft.focus(); draft.setSelectionRange(3, 14, 'backward');
     const before = [draft.value, draft.selectionStart, draft.selectionEnd, draft.selectionDirection, document.activeElement];
@@ -16,7 +16,7 @@
     await call({ kind: 'visibility', key: 'ports', visible: false });
     const persisted = await call({ kind: 'status' });
     if (persisted.snapshot.display_mode !== 'detailed' || persisted.snapshot.visibility.ports) throw new Error('Settings not persisted');
-    for (const request of [{ kind: 'inbox', recipient: 'session:other' }, { kind: 'refresh' }, { kind: 'ack', id: 999999 }]) {
+    for (const request of [{ kind: 'add_project', path: '/tmp' }, { kind: 'sidebar', host_url: 'https://example.com' }, { kind: 'inbox', recipient: 'session:other' }, { kind: 'refresh' }, { kind: 'ack', id: 999999 }]) {
       let rejected = false;
       try { await call(request); } catch (error) {
         rejected = request.kind !== 'ack' || error instanceof Error && error.message === 'message not in recipient inbox';
