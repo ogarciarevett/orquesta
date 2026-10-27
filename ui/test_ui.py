@@ -33,8 +33,9 @@ def ipc(operation):
 class InboxUI(unittest.TestCase):
     def test_durable_inbox_never_changes_human_input(self):
         with tempfile.TemporaryDirectory() as directory:
-            env = dict(os.environ, ORQUESTA_MAILBOX_DIR=directory)
-            server = subprocess.Popen(["python3", "ui/serve.py"], cwd=ROOT, env=env, stdout=subprocess.DEVNULL)
+            os.environ["ORQUESTA_MAILBOX_DIR"] = directory
+            os.environ["ORQUESTA_USAGE_FIXTURES"] = str(Path(directory) / "usage.json")
+            server = subprocess.Popen(["python3", "ui/serve.py"], cwd=ROOT, stdout=subprocess.DEVNULL)
             try:
                 for attempt in range(600):
                     try:
@@ -106,6 +107,8 @@ class InboxUI(unittest.TestCase):
                 self.assertFalse(evaluate("document.querySelector('#safety').checked"))
                 browser("press", "Tab")
                 self.assertTrue(evaluate("document.activeElement !== document.body"))
+                from test_status_bar import verify_status_bar
+                verify_status_bar(self, browser, evaluate, ipc)
                 rows = ipc(dict(command="inbox", recipient="session:s"))["result"]
                 self.assertEqual(len(rows), 3)
                 self.assertTrue(rows[0]["acknowledged"])

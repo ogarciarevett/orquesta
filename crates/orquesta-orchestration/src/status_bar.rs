@@ -68,10 +68,32 @@ pub struct Provider {
     pub phase: Phase,
     pub windows: Vec<Window>,
     pub updated_at: Option<u64>,
+    #[serde(default)]
+    pub plan: Option<String>,
     pending: Option<String>,
+    #[serde(default)]
+    lease_until: Option<u64>,
     completed: BTreeSet<String>,
 }
 impl Provider {
+    fn failed_phase(&self) -> Phase {
+        if self
+            .windows
+            .iter()
+            .any(|window| window.percent_used.is_some())
+        {
+            Phase::ErrorCached
+        } else {
+            Phase::ErrorNoCache
+        }
+    }
+    fn recover(&mut self, now: u64) {
+        if self.pending.is_some() && self.lease_until.is_none_or(|until| now >= until) {
+            self.phase = self.failed_phase();
+            self.completed.insert(self.pending.take().unwrap());
+            self.lease_until = None;
+        }
+    }
     fn new(id: String, name: String) -> Self {
         Self {
             id,
@@ -150,13 +172,17 @@ pub enum Action {
         token: u64,
         now: u64,
         phase: Phase,
+        plan: Option<String>,
         #[serde(default)]
         windows: Vec<Window>,
     },
 }
 impl Mailbox {
     pub fn status_bar(&self, action: Action) -> Result<Value> {
-        self.transaction(|state| state.status_bar.apply(action))
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs();
+        self.transaction(|state| state.status_bar.apply(action, now))
     }
 }
 impl StatusBar {
@@ -164,7 +190,10 @@ impl StatusBar {
         let provider = self.providers.iter_mut().find(|p| p.id == id);
         provider.ok_or_else(|| invalid("unknown provider"))
     }
-    fn apply(&mut self, action: Action) -> Result<Value> {
+    fn apply(&mut self, action: Action, now: u64) -> Result<Value> {
+        for provider in &mut self.providers {
+            provider.recover(now);
+        }
         let mut started = false;
         let mut token = None;
         let mut urgent = Vec::new();
@@ -205,6 +234,7 @@ impl StatusBar {
                 let provider = self.provider(&id)?;
                 if provider.pending.is_none() && !provider.completed.contains(&request_id) {
                     provider.pending = Some(request_id);
+                    provider.lease_until = Some(now.saturating_add(30));
                     provider.phase = Phase::Refreshing;
                     started = true;
                 }
@@ -218,6 +248,7 @@ impl StatusBar {
                 token,
                 now,
                 phase,
+                plan,
                 mut windows,
             } => {
                 let provider = self.provider(&id)?;
@@ -239,20 +270,19 @@ impl StatusBar {
                         }
                         provider.windows = windows;
                         provider.updated_at = Some(now);
+                        if plan.is_some() {
+                            provider.plan = plan;
+                        }
                         Phase::Ready
                     }
-                    Phase::ErrorNoCache | Phase::ErrorCached
-                        if provider.windows.iter().any(|w| w.percent_used.is_some()) =>
-                    {
-                        Phase::ErrorCached
-                    }
-                    Phase::ErrorNoCache | Phase::ErrorCached => Phase::ErrorNoCache,
+                    Phase::ErrorNoCache | Phase::ErrorCached => provider.failed_phase(),
                     Phase::Loading | Phase::Refreshing => {
                         return Err(invalid("refresh requires a terminal state"));
                     }
                     other => other,
                 };
                 provider.completed.insert(provider.pending.take().unwrap());
+                provider.lease_until = None;
             }
         }
         let counts: BTreeMap<_, _> = [Inventory::Terminals, Inventory::Ports, Inventory::Hosts]
@@ -286,5 +316,78 @@ mod tests {
             assert_eq!(window.reset_in_seconds, Some(3600));
             assert_eq!(window.reset_at_iso.as_deref(), Some("2026-10-27T12:00:00Z"));
         }
+    }
+    #[test]
+    fn restart_and_timeout_release_claims_without_accepting_late_results() {
+        let mut state = StatusBar::default();
+        let begin = |key: &str| Action::Begin {
+            id: "codex".into(),
+            request_id: key.into(),
+        };
+        let first = state.apply(begin("interrupted"), 10).unwrap();
+        let directory = std::env::temp_dir().join(format!("status-lease-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let stored = json!({"status_bar": state, "recipients": [], "messages": []});
+        std::fs::write(
+            directory.join("mailbox.json"),
+            serde_json::to_vec(&stored).unwrap(),
+        )
+        .unwrap();
+        let reopened = Mailbox::open(&directory)
+            .unwrap()
+            .status_bar(Action::Snapshot)
+            .unwrap();
+        assert_eq!(
+            reopened["snapshot"]["providers"][1]["phase"],
+            "error_no_cache"
+        );
+        std::fs::remove_dir_all(&directory).unwrap();
+        let persisted = serde_json::to_vec(&state).unwrap();
+        let mut state: StatusBar = serde_json::from_slice(&persisted).unwrap();
+        assert_eq!(
+            state.apply(begin("duplicate"), 39).unwrap()["started"],
+            false
+        );
+        let expired = state.apply(Action::Snapshot, 40).unwrap();
+        assert_eq!(
+            expired["snapshot"]["providers"][1]["phase"],
+            "error_no_cache"
+        );
+        let second = state.apply(begin("retry"), 41).unwrap();
+        assert_eq!(second["started"], true);
+        let finish = |token| Action::Finish {
+            id: "codex".into(),
+            token,
+            now: 42,
+            phase: Phase::Ready,
+            plan: None,
+            windows: vec![serde_json::from_value(json!({"label":"5h", "percent_used":0})).unwrap()],
+        };
+        assert!(
+            state
+                .apply(finish(first["token"].as_u64().unwrap()), 42)
+                .is_err()
+        );
+        state
+            .apply(finish(second["token"].as_u64().unwrap()), 42)
+            .unwrap();
+        state.apply(begin("cached-timeout"), 43).unwrap();
+        let expired = state.apply(Action::Snapshot, 73).unwrap();
+        assert_eq!(expired["snapshot"]["providers"][1]["phase"], "error_cached");
+        assert_eq!(
+            expired["snapshot"]["providers"][1]["windows"][0]["percent_used"],
+            0.0
+        );
+        state.apply(begin("legacy"), 74).unwrap();
+        let mut legacy = serde_json::to_value(&state).unwrap();
+        legacy["providers"][1]
+            .as_object_mut()
+            .unwrap()
+            .remove("lease_until");
+        let mut legacy: StatusBar = serde_json::from_value(legacy).unwrap();
+        assert_eq!(
+            legacy.apply(begin("after-restart"), 75).unwrap()["started"],
+            true
+        );
     }
 }
