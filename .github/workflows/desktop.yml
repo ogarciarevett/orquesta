@@ -29,6 +29,7 @@ jobs:
           wc -l Cargo.lock > evidence/lock-count.txt
           cargo metadata --locked --format-version 1 > evidence/dependencies.json
           cargo fetch --locked --target aarch64-apple-darwin
+      - run: npx --yes @tauri-apps/cli@2 icon icon.svg
       - name: Test native boundary offline
         run: cargo test --locked --offline
       - name: Build internal ad hoc app

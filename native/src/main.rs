@@ -36,11 +36,12 @@ fn dispatch(runtime: &Runtime, request: DesktopRequest) -> Result<Value, String>
     Ok(result)
 }
 #[tauri::command]
-fn desktop_request(window: tauri::WebviewWindow, state: tauri::State<'_, Runtime>, request: DesktopRequest) -> Result<Value, String> {
+async fn desktop_request(window: tauri::WebviewWindow, app: tauri::AppHandle, request: DesktopRequest) -> Result<Value, String> {
     if window.label() != "main" || !local_url(&window.url().map_err(|error| error.to_string())?) {
         return Err("Untrusted desktop caller".into());
     }
-    dispatch(&state, request)
+    tauri::async_runtime::spawn_blocking(move || dispatch(app.state::<Runtime>().inner(), request))
+        .await.map_err(|error| error.to_string())?
 }
 fn local_url(url: &tauri::Url) -> bool {
     url.scheme() == "tauri" && url.host_str() == Some("localhost")
@@ -83,6 +84,32 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn persisted_inbox_boundary_and_corruption() {
+        let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let directory = std::env::temp_dir().join(format!("orquesta-native-{nonce}"));
+        let mailbox = Mailbox::open(&directory).unwrap();
+        mailbox.register(RECIPIENT).unwrap();
+        mailbox.register("session:other").unwrap();
+        let envelope = orquesta_orchestration::Envelope {
+            request_id: "native-test".into(), from: "session:other".into(), to: RECIPIENT.into(),
+            kind: "notice".into(), subject: "Inbox test".into(), body: "Separate from draft".into(),
+            thread: None, metadata: Default::default(),
+        };
+        let message = mailbox.send(envelope).unwrap();
+        let runtime = Runtime(mailbox);
+        assert_eq!(dispatch(&runtime, DesktopRequest::Inbox).unwrap().as_array().unwrap().len(), 1);
+        dispatch(&runtime, DesktopRequest::Read).unwrap();
+        assert_eq!(dispatch(&runtime, DesktopRequest::Reconnect).unwrap()[0]["id"], message.id);
+        dispatch(&runtime, DesktopRequest::Ack { id: message.id }).unwrap();
+        assert_eq!(dispatch(&runtime, DesktopRequest::Reconnect).unwrap(), json!([]));
+        dispatch(&runtime, DesktopRequest::Visibility { key: "ports".into(), visible: false }).unwrap();
+        let reopened = Runtime(Mailbox::open(&directory).unwrap());
+        assert_eq!(dispatch(&reopened, DesktopRequest::Status).unwrap()["snapshot"]["visibility"]["ports"], false);
+        std::fs::write(directory.join("mailbox.json"), "corrupt").unwrap();
+        assert!(dispatch(&reopened, DesktopRequest::Status).is_err());
+        std::fs::remove_dir_all(directory).unwrap();
+    }
     #[test]
     fn rejects_webview_authority_expansion() {
         for input in [r#"{"kind":"send"}"#, r#"{"kind":"inbox","recipient":"session:other"}"#, r#"{"kind":"status","path":"/tmp"}"#, r#"{"kind":"finish","windows":[]}"#] {
