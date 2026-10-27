@@ -7,7 +7,7 @@ const mobile = matchMedia('(max-width: 700px)');
 const rows = new Map();
 let connected = true, pending = false, generation = 0;
 safety.checked = localStorage.getItem(preference + 'notifications') !== 'false';
-safety.onchange = () => localStorage.setItem(preference + 'notifications', safety.checked);
+safety.onchange = () => { localStorage.setItem(preference + 'notifications', safety.checked); if (!safety.checked) element('notice').textContent = ''; };
 function theme(value) {
   document.documentElement.dataset.theme = value;
   element('theme').textContent = `Dev: Theme ${value === 'dark' ? 'Dark' : 'Light'}`;
@@ -48,7 +48,7 @@ function render(messages) {
   let arrivals = 0;
   for (const message of messages.sort((a, b) => a.id - b.id)) {
     let row = rows.get(message.id);
-    if (!row) { row = text('li', '', 'message'); row.dataset.id = message.id; row.tabIndex = -1; rows.set(message.id, row); element('messages').append(row); arrivals++; }
+    if (!row) { row = text('li', '', 'message'); row.dataset.id = message.id; row.tabIndex = -1; rows.set(message.id, row); element('messages').append(row); arrivals += Number(!message.read && !message.acknowledged); }
     if (row.signature === JSON.stringify(message)) continue;
     row.signature = JSON.stringify(message);
     const focused = row.contains(document.activeElement);
@@ -71,7 +71,7 @@ function render(messages) {
   element('badge').textContent = unread; element('badge').hidden = !unread;
   element('inbox-toggle').setAttribute('aria-label', unread ? `Inbox, ${unread} unread` : 'Inbox');
   element('read-batch').disabled = !unread; element('empty').hidden = !!messages.length;
-  if (arrivals && safety.checked) element('notice').textContent = `${arrivals} new inbox ${arrivals === 1 ? 'message' : 'messages'}.`;
+  element('notice').textContent = unread && safety.checked && arrivals ? `${arrivals} new inbox ${arrivals === 1 ? 'message' : 'messages'}.` : '';
   times();
 }
 function failure(error) { element('status').textContent = `Error: ${error.message}`; element('retry').hidden = false; }
@@ -83,7 +83,7 @@ async function refresh() {
     const messages = await ipc('inbox');
     if (!connected || generation !== current) return;
     render(messages); element('status').textContent = 'Connected'; element('retry').hidden = true;
-    const date = new Date(); element('last-good').dateTime = element('last-good').title = date.toISOString(); element('last-good').textContent = `Last synced ${date.toLocaleTimeString()}`;
+    const date = new Date(); element('last-good').dateTime = element('last-good').title = date.toISOString(); element('last-good').textContent = `synced ${date.toLocaleTimeString()}`;
   } catch (error) { if (connected && generation === current) failure(error); }
   finally { pending = false; }
 }
@@ -94,14 +94,14 @@ async function act(command, fields) {
 }
 async function reconnect() {
   connected = true; generation++;
-  element('connection').textContent = 'Disconnect'; element('status').textContent = 'Reconnecting…';
+  element('connection').textContent = 'Disconnect'; element('status').textContent = 'Reconnecting…'; element('retry').hidden = true;
   await act('check', { peek: false });
 }
 element('read-batch').onclick = () => act('check', { peek: false });
 element('retry').onclick = reconnect;
 element('connection').onclick = () => {
   if (!connected) return reconnect();
-  connected = false; generation++; element('connection').textContent = 'Reconnect'; element('status').textContent = 'Disconnected'; element('retry').hidden = false;
+  connected = false; generation++; element('connection').textContent = 'Reconnect'; element('status').textContent = 'Disconnected'; element('retry').hidden = true;
 };
 element('composer').onsubmit = event => { event.preventDefault(); element('submissions').value = Number(element('submissions').value) + 1; };
 refresh();

@@ -23,14 +23,14 @@
       <div class="heading"><h2 id="inbox-title">Orchestration inbox</h2><button id="inbox-close" type="button">Close</button></div>
       <a id="inbox-settings" href="#settingsdialog">Inbox settings</a>
       <div class="tools"><button id="read-batch" type="button">Mark all as read</button><button id="connection" type="button">Disconnect</button></div>
-      <p id="status" role="status">Reconnecting…</p><button id="retry" type="button" hidden>Retry</button>
-      <time id="last-good">Not synced yet</time><p id="notice" role="status" aria-live="polite"></p>
+      <div><span id="status" role="status">Reconnecting…</span> · <time id="last-good">Not synced yet</time><button id="retry" type="button" hidden>Retry</button></div>
+      <p id="notice" role="status" aria-live="polite"></p>
       <ol id="messages" aria-label="Inbox messages"><li id="empty">Inbox is clear. Incoming messages appear here.</li></ol>
       <p class="help">Unacknowledged mail replays after reconnect. Acknowledged items stay in history.</p>
     </dialog>
   </main>
   <dialog id="settingsdialog" aria-labelledby="settings-title">
-    <div class="heading"><h2 id="settings-title">Settings</h2><button id="settings-close" type="button">Close</button></div>
+    <div class="heading"><h2 id="settings-title">Inbox settings</h2><button id="settings-close" type="button">Close</button></div>
     <h3>AI Capabilities › Orchestration <small>Host</small></h3>
     <p><strong>Inbox safety</strong></p><p>Draft protection is always on.</p>
     <h3>Interface › Notifications <small>Host</small></h3>
