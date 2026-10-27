@@ -92,6 +92,10 @@ impl Mailbox {
     }
 
     pub fn send(&self, envelope: Envelope) -> Result<Message> {
+        self.send_receipt(envelope).map(|(message, _)| message)
+    }
+
+    pub fn send_receipt(&self, envelope: Envelope) -> Result<(Message, bool)> {
         self.transaction(|state| {
             if envelope.request_id.is_empty()
                 || !state.recipients.contains(&envelope.to)
@@ -107,7 +111,7 @@ impl Mailbox {
                 .find(|m| m.envelope.request_id == envelope.request_id)
             {
                 return if prior.envelope == envelope {
-                    Ok(prior.clone())
+                    Ok((prior.clone(), false))
                 } else {
                     Err(invalid("request ID conflict"))
                 };
@@ -119,7 +123,7 @@ impl Mailbox {
                 acknowledged: false,
             };
             state.messages.push(message.clone());
-            Ok(message)
+            Ok((message, true))
         })
     }
 
@@ -198,3 +202,6 @@ pub struct TerminalDraftBuffer {
 
 #[cfg(test)]
 mod tests;
+
+pub mod composer;
+pub mod runtime;

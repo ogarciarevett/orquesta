@@ -16,3 +16,8 @@ The local CLI reads ORQUESTA_MAILBOX_DIR, ORQUESTA_RUN_ID, and ORQUESTA_FROM.
 Trusted runtime code must register recipients first. Run `cargo run --bin
 orquesta -- schema` for the six-command registry. Remote capabilities and
 Tauri IPC integration remain pending; unsupported connections fail explicitly.
+
+`orquesta ipc` reads one versioned JSON Request from stdin and returns a Response
+with separate MailEvent notifications. Version 1 dispatches mailbox commands;
+unsupported versions fail. SessionComposer keeps draft editing and explicit
+submission separate from inbox notifications, acknowledgement, and reconnect.

@@ -1,6 +1,9 @@
 // Copyright (c) 2026 Lovecast Inc.
 // SPDX-License-Identifier: MIT
-use orquesta_orchestration::{Envelope, Mailbox, Result};
+use orquesta_orchestration::{
+    Envelope, Mailbox, Result,
+    runtime::{Request, Runtime},
+};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
@@ -34,13 +37,21 @@ const SWITCHES: &[&str] = &[
 fn error(text: &str) -> Box<dyn std::error::Error> {
     io::Error::new(io::ErrorKind::InvalidInput, text).into()
 }
+fn usage(command: &str) -> Value {
+    serde_json::from_str::<Value>(include_str!("../usage.json")).unwrap()[command].clone()
+}
 fn registry() -> Value {
     json!({"version": 1, "messageTypes": MESSAGE_TYPES.split(',').collect::<Vec<_>>(), "commands": COMMANDS.iter().map(|(name, flags)| {
         json!({"path": ["orchestration", name], "flags": format!("{GLOBAL},{flags}").split(',').collect::<Vec<_>>(),
-            "aliases": [], "positionals": [], "repeatable": []})
+            "usage": usage(name), "aliases": [], "positionals": [], "repeatable": []})
     }).collect::<Vec<_>>()})
 }
 fn run(args: Vec<String>) -> Result<Value> {
+    if args == ["ipc"] {
+        let directory = std::env::var("ORQUESTA_MAILBOX_DIR")?;
+        let request: Request = serde_json::from_reader(std::io::stdin())?;
+        return Ok(json!(Runtime(Mailbox::open(directory)?).dispatch(request)?));
+    }
     if args == ["schema"] {
         return Ok(registry());
     }
@@ -77,7 +88,7 @@ fn run(args: Vec<String>) -> Result<Value> {
     }
     if flags.contains_key("help") {
         return Ok(
-            json!({"usage": format!("orquesta orchestration {command}"), "flags": allowed.split(',').collect::<Vec<_>>()}),
+            json!({"usage": usage(command), "flags": allowed.split(',').collect::<Vec<_>>()}),
         );
     }
     let get = |name: &str| flags.get(name).copied();

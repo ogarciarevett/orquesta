@@ -35,7 +35,14 @@ fn registry_validation_and_durable_command_roundtrip() {
     };
     assert_eq!(call(&["schema"])["commands"].as_array().unwrap().len(), 6);
     for name in ["ask", "check", "inbox", "reply", "request-show", "send"] {
-        assert!(call(&[name, "--help"])["flags"].is_array());
+        let help = call(&[name, "--help"]);
+        assert!(help["flags"].is_array());
+        assert!(
+            help["usage"]
+                .as_str()
+                .unwrap()
+                .starts_with(&format!("orca orchestration {name}"))
+        );
         assert!(!invoke(&[name, "--unknown"]).status.success());
     }
     for args in [
