@@ -20,6 +20,8 @@ jobs:
       - name: Record hosted architecture and resolve lock
         run: |
           mkdir -p evidence
+          rustfmt --edition 2024 --emit stdout src/main.rs > evidence/main.rs
+          rustfmt --edition 2024 --emit stdout build.rs > evidence/build.rs
           uname -m | tee evidence/architecture.txt
           test "$(uname -m)" = arm64
           rustc -Vv > evidence/toolchain.txt

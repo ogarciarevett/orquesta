@@ -13,5 +13,5 @@
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'"
     }
   },
-  "bundle": { "active": true, "targets": ["app"], "macOS": { "minimumSystemVersion": "13.0", "signingIdentity": "-" } }
+  "bundle": { "active": true, "targets": ["app"], "icon": ["icons/icon.icns"], "macOS": { "minimumSystemVersion": "13.0", "signingIdentity": "-" } }
 }
