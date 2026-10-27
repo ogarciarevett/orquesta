@@ -38,6 +38,8 @@ pub struct Message {
 #[derive(Default, Serialize, Deserialize)]
 struct State {
     #[serde(default)]
+    sidebar: sidebar::Catalog,
+    #[serde(default)]
     status_bar: status_bar::StatusBar,
     recipients: Vec<String>,
     messages: Vec<Message>,
@@ -212,4 +214,5 @@ mod tests;
 
 pub mod composer;
 pub mod runtime;
+pub mod sidebar;
 pub mod status_bar;

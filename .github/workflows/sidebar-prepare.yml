@@ -1,0 +1,25 @@
+name: Sidebar hosted preparation
+on:
+  push:
+    branches: ['sidebar-110-*']
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          components: rustfmt
+      - run: cargo fmt --all
+      - run: cargo fmt --manifest-path native/Cargo.toml
+      - run: cargo generate-lockfile --manifest-path native/Cargo.toml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sidebar-prepared-${{ github.sha }}
+          path: |
+            crates/orquesta-orchestration/src/sidebar.rs
+            crates/orquesta-orchestration/src/lib.rs
+            native/src/main.rs
+            native/Cargo.lock
