@@ -24,7 +24,6 @@ jobs:
           node-version: 24
       - run: npx --yes agent-browser@0.39.4 install --with-deps
       - run: python3 -m unittest discover -s ui -p test_focus.py -v
-      - run: python3 -m unittest discover -s ui -p test_sidebar.py -v
       - uses: actions/checkout@v4
         with:
           repository: stablyai/orca
@@ -34,6 +33,9 @@ jobs:
         with:
           version: 12.14.0
       - run: pnpm --dir .orca-reference install --frozen-lockfile --ignore-scripts
+      - run: python3 -m unittest discover -s ui -p test_sidebar.py -v
+        env:
+          ORCA_REFERENCE_ROOT: ${{ github.workspace }}/.orca-reference
       - run: python3 ui/test_ui.py
         env:
           ORCA_REFERENCE_ROOT: ${{ github.workspace }}/.orca-reference
