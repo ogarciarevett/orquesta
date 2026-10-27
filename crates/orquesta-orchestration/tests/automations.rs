@@ -12,7 +12,8 @@ struct Fixture(PathBuf);
 impl Fixture {
     fn new() -> Result<Self> {
         let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
-        let fixture = Self(std::env::temp_dir().join(format!("automation-{}-{nonce:?}", std::process::id())));
+        let fixture =
+            Self(std::env::temp_dir().join(format!("automation-{}-{nonce:?}", std::process::id())));
         let mailbox = Mailbox::open(&fixture.0)?;
         for name in ["first", "second"] {
             let folder = fixture.0.join(name);
@@ -28,7 +29,7 @@ impl Fixture {
         fs::read(self.0.join("mailbox.json")).unwrap()
     }
     fn write(&self, state: &Value) {
-        fs::write(self.0.join("mailbox.json"), serde_json::to_vec(state).unwrap()).unwrap();
+        fs::write(self.0.join("mailbox.json"), state.to_string()).unwrap();
     }
 }
 impl Drop for Fixture {
@@ -42,7 +43,10 @@ fn draft() -> AutomationDraft {
         prompt: " \nReview λ\n  preserve indentation\n".into(),
         project_id: "project-1".into(),
         workspace_id: "folder-1".into(),
-        schedule: Schedule::Interval { every_seconds: 60, anchor_utc_seconds: 0 },
+        schedule: Schedule::Interval {
+            every_seconds: 60,
+            anchor_utc_seconds: 0,
+        },
     }
 }
 
@@ -52,13 +56,26 @@ fn migration_reopen_and_replacement_preserve_mail_and_preferences() -> Result<()
     let mailbox = fixture.mailbox()?;
     mailbox.register("session:s")?;
     let message = mailbox.send(Envelope {
-        request_id: "draft-unread".into(), to: "session:s".into(), from: "session:s".into(),
-        kind: "notice".into(), subject: "Unread".into(), body: "Keep".into(),
-        thread: None, metadata: Default::default(),
+        request_id: "draft-unread".into(),
+        to: "session:s".into(),
+        from: "session:s".into(),
+        kind: "notice".into(),
+        subject: "Unread".into(),
+        body: "Keep".into(),
+        thread: None,
+        metadata: Default::default(),
     })?;
-    mailbox.status_bar(Action::Visibility { key: "ports".into(), visible: false })?;
+    mailbox.status_bar(Action::Visibility {
+        key: "ports".into(),
+        visible: false,
+    })?;
     let sidebar = mailbox.sidebar_snapshot()?;
-    mailbox.sidebar_preference(sidebar.revision, Preference::Select { workspace_id: "folder-1".into() })?;
+    mailbox.sidebar_preference(
+        sidebar.revision,
+        Preference::Select {
+            workspace_id: "folder-1".into(),
+        },
+    )?;
     let mut old: Value = serde_json::from_slice(&fixture.bytes())?;
     old.as_object_mut().unwrap().remove("automations");
     fixture.write(&old);
@@ -89,15 +106,21 @@ fn migration_reopen_and_replacement_preserve_mail_and_preferences() -> Result<()
 fn concurrent_handles_commit_only_one_revision() -> Result<()> {
     let fixture = Fixture::new()?;
     let barrier = Arc::new(std::sync::Barrier::new(2));
-    let handles: Vec<_> = (0..2).map(|_| {
-        let mailbox = fixture.mailbox().unwrap();
-        let barrier = barrier.clone();
-        std::thread::spawn(move || {
-            barrier.wait();
-            mailbox.automation_save(0, None, draft()).is_ok()
+    let handles: Vec<_> = (0..2)
+        .map(|_| {
+            let mailbox = fixture.mailbox().unwrap();
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                mailbox.automation_save(0, None, draft()).is_ok()
+            })
         })
-    }).collect();
-    let successes = handles.into_iter().map(|handle| handle.join().unwrap()).filter(|ok| *ok).count();
+        .collect();
+    let successes = handles
+        .into_iter()
+        .map(|handle| handle.join().unwrap())
+        .filter(|ok| *ok)
+        .count();
     assert_eq!(successes, 1);
     let snapshot = fixture.mailbox()?.automation_snapshot()?;
     assert_eq!(snapshot.revision, 1);
@@ -111,19 +134,27 @@ fn invalid_drafts_and_ids_leave_committed_bytes_unchanged() -> Result<()> {
     let mailbox = fixture.mailbox()?;
     let before = fixture.bytes();
     for (field, value) in [
-        ("name", json!(" ")), ("name", json!("λ".repeat(61))),
-        ("prompt", json!(" \n\t")), ("prompt", json!("x".repeat(32769))),
-        ("project_id", json!("project-missing")), ("workspace_id", json!("folder-2")),
-        ("schedule", json!({"kind":"interval","every_seconds":59,"anchor_utc_seconds":0})),
-        ("schedule", json!({"kind":"interval","every_seconds":31536001,"anchor_utc_seconds":0})),
-        ("schedule", json!({"kind":"interval","every_seconds":60,"anchor_utc_seconds":253402300800u64})),
+        ("/name", json!(" ")),
+        ("/name", json!("λ".repeat(61))),
+        ("/prompt", json!(" \n\t")),
+        ("/prompt", json!("x".repeat(32769))),
+        ("/project_id", json!("project-missing")),
+        ("/workspace_id", json!("folder-2")),
+        ("/schedule/every_seconds", json!(59)),
+        ("/schedule/every_seconds", json!(31536001)),
+        ("/schedule/anchor_utc_seconds", json!(253402300800u64)),
     ] {
         let mut input = serde_json::to_value(draft())?;
-        input[field] = value;
-        assert!(mailbox.automation_save(0, None, serde_json::from_value(input)?).is_err());
+        *input.pointer_mut(field).unwrap() = value;
+        let invalid = serde_json::from_value(input)?;
+        assert!(mailbox.automation_save(0, None, invalid).is_err());
         assert_eq!(fixture.bytes(), before);
     }
-    assert!(mailbox.automation_save(0, Some("automation-unknown".into()), draft()).is_err());
+    assert!(
+        mailbox
+            .automation_save(0, Some("automation-unknown".into()), draft())
+            .is_err()
+    );
     assert_eq!(fixture.bytes(), before);
     Ok(())
 }
@@ -135,8 +166,13 @@ fn malformed_storage_and_obstructed_write_never_reset_state() -> Result<()> {
     mailbox.automation_save(0, None, draft())?;
     let before = fixture.bytes();
     let original: Value = serde_json::from_slice(&before)?;
-    for pointer in ["/automations/schema", "/automations/counter", "/automations/revision",
-        "/automations/definitions/0/draft/path", "/automations/definitions/0/draft/schedule/host"] {
+    for pointer in [
+        "/automations/schema",
+        "/automations/counter",
+        "/automations/revision",
+        "/automations/definitions/0/draft/path",
+        "/automations/definitions/0/draft/schedule/host",
+    ] {
         let mut state = original.clone();
         if pointer.ends_with("path") {
             state["automations"]["definitions"][0]["draft"]["path"] = json!("/tmp");
@@ -167,7 +203,10 @@ fn accepted_limits_and_capacity_survive_reopen() -> Result<()> {
     let mut boundary = draft();
     boundary.name = "λ".repeat(60);
     boundary.prompt = "x".repeat(32768);
-    boundary.schedule = Schedule::Interval { every_seconds: 31_536_000, anchor_utc_seconds: 253_402_300_799 };
+    boundary.schedule = Schedule::Interval {
+        every_seconds: 31_536_000,
+        anchor_utc_seconds: 253_402_300_799,
+    };
     mailbox.automation_save(0, None, boundary.clone())?;
     for revision in 1..128 {
         mailbox.automation_save(revision, None, draft())?;

@@ -111,7 +111,9 @@ impl Mailbox {
             let catalog = &mut state.automations;
             catalog.snapshot()?;
             if catalog.revision != expected_revision {
-                return Err(invalid("automations changed; reload snapshot before retrying"));
+                return Err(invalid(
+                    "automations changed; reload snapshot before retrying",
+                ));
             }
             draft.validate()?;
             if !state.sidebar.snapshot().projects.iter().any(|project| {
