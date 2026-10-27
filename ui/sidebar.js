@@ -44,6 +44,7 @@
     list.replaceChildren();
     if (!snapshot.projects.length) { get('project-status').textContent = 'Add an existing local folder to get started.'; return; }
     get('project-status').textContent = '';
+    toggle.textContent = snapshot.projects.find(project => project.workspace_id === snapshot.selected)?.label || 'Projects';
     const host = group(`This Mac · ${snapshot.projects.length} folders`, 'local', list);
     for (const project of snapshot.projects) {
       const children = group(`${project.label} — This Mac`, project.id, host);
@@ -54,6 +55,14 @@
       const selected = snapshot.selected === project.workspace_id;
       row.setAttribute('aria-selected', String(selected));
       if (selected) row.setAttribute('aria-current', 'true');
+      row.onkeydown = event => {
+        if (!['ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) return;
+        event.preventDefault();
+        const visible = [...list.querySelectorAll('[role=option]')].filter(node => node.checkVisibility());
+        const index = visible.indexOf(row);
+        const next = ['Home', 'PageUp'].includes(event.key) ? 0 : ['End', 'PageDown'].includes(event.key) ? visible.length - 1 : index + (event.key === 'ArrowUp' ? -1 : 1);
+        visible[Math.max(0, Math.min(next, visible.length - 1))]?.focus();
+      };
       options.append(row); children.append(options);
     }
     if (focused) [...list.querySelectorAll('button')].find(node => node.dataset.id === focused)?.focus({ preventScroll: true });

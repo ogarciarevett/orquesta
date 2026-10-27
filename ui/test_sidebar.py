@@ -1,10 +1,15 @@
 # Copyright (c) 2026 Lovecast Inc. Copyright (c) 2026 Omar Garcia. SPDX-License-Identifier: MIT
 """Projection fixtures exercise UI only; they do not prove native picker operation."""
-from test_focus import FocusUI
+import unittest
+import test_focus
 from test_ui import browser, evaluate, SHOTS
 
 
-class SidebarUI(FocusUI):
+class SidebarUI(unittest.TestCase):
+    setUp = test_focus.FocusUI.setUp
+    close_host = test_focus.FocusUI.close_host
+    draft_state = test_focus.FocusUI.draft_state
+    prepare_draft = test_focus.FocusUI.prepare_draft
     def test_projection_selection_collapse_and_draft(self):
         before = self.prepare_draft()
         evaluate("""window.sidebarFixture = {revision: 1, selected: null, collapsed: [], projects: [

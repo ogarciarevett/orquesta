@@ -23,6 +23,7 @@ main:has(#inbox:not([open])) { grid-template-columns: 280px minmax(640px, 1fr); 
   body > header { height: 48px; padding: 2px 8px; gap: 4px; }
   body > header .brand { display: none; }
   #projects-toggle, #projects-close { display: block; }
+  #projects-toggle { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
   #projects { position: fixed; inset: 48px 0 36px; z-index: 5; overflow-y: auto; }
   #projects button { min-height: 44px; }
 }
