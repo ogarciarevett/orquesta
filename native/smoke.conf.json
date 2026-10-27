@@ -1,0 +1,3 @@
+{
+  "app": { "security": { "capabilities": [{ "identifier": "main-smoke", "windows": ["main"], "permissions": ["allow-desktop-request", "allow-smoke-complete"] }] } }
+}

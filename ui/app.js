@@ -27,6 +27,7 @@ inbox.onclose = () => { element('inbox-toggle').setAttribute('aria-expanded', St
 document.querySelectorAll('a[href="#settingsdialog"]').forEach(link => { link.onclick = event => { event.preventDefault(); settings.showModal(); }; });
 element('settings-close').onclick = () => settings.close();
 async function ipc(command, fields = {}) {
+  if (window.orquestaNative) return window.orquestaNative(command, fields);
   const response = await fetch('/ipc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: 1, operation: { command, recipient, ...fields } }) });
   const data = await response.json();
   if (!response.ok || data.error) throw new Error(data.error?.message || 'Mailbox unavailable');

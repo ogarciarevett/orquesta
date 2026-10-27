@@ -1,0 +1,6 @@
+{
+  "identifier": "main",
+  "description": "Local main webview can access only the trusted desktop request boundary.",
+  "windows": ["main"],
+  "permissions": ["allow-desktop-request"]
+}
