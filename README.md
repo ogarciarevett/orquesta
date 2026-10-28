@@ -35,8 +35,16 @@ later screen model. `read(cursor)` returns output and the next cursor from a 1 t
 2 MiB scrollback and holds back a character split across reads. `interrupt`,
 `resize`, `exit_code` and `close` act on that terminal's direct process; dropping
 a terminal also stops and reaps it. Tests run a real shell on Unix CI; Windows
-ConPTY compiles but is not tested yet. No inbox wiring, CLI, Tauri command,
-renderer or restore exists yet.
+ConPTY compiles but is not tested yet. No CLI, Tauri command, renderer or
+restore exists yet.
+
+`SessionComposer::submit_to` sends the human draft line by line; each written
+line leaves the draft, so a retry never repeats it, and a closed terminal keeps
+the draft. `send_automation` always presses Enter and is refused while the
+person has an unsent draft or text waits on the terminal input line, so inbox
+mail stays in the inbox instead of typing over the person. Code that holds the
+`Terminal` itself is not restricted; later host wiring must route automation
+input through the composer.
 
 Orca reference: https://github.com/stablyai/orca, MIT License.
 Copyright (c) 2026 Lovecast Inc. See THIRD_PARTY_NOTICES.md for the full notice.

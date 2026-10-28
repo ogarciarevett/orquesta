@@ -3,7 +3,9 @@
 use crate::{
     Message, Result, TerminalDraftBuffer, invalid,
     runtime::{MailEvent, Operation, Runtime},
+    terminal::Terminal,
 };
+use std::time::Duration;
 
 pub struct SessionComposer {
     recipient: String,
@@ -57,6 +59,47 @@ impl SessionComposer {
         self.draft.cursor = 0;
         self.draft.selection = None;
         std::mem::take(&mut self.draft.text)
+    }
+    /// Sends the human draft to the session terminal line by line. Each line
+    /// leaves the draft once it is written, so a retry never repeats it; with a
+    /// wait, an unconfirmed line stops and keeps the rest. Returns whether the last
+    /// line was confirmed.
+    pub fn submit_to(&mut self, terminal: &mut Terminal, wait: Option<Duration>) -> Result<bool> {
+        if self.draft.text.is_empty() {
+            return Err(invalid("nothing to submit"));
+        }
+        loop {
+            let text = self.draft.text.clone();
+            let (line, rest) = text.split_once('\n').unwrap_or((&text, ""));
+            let confirmed = terminal.send(line.trim_end_matches('\r'), true, wait)?;
+            self.draft = TerminalDraftBuffer {
+                text: rest.into(),
+                cursor: 0,
+                selection: None,
+            };
+            if rest.is_empty() {
+                self.submissions += 1;
+                return Ok(confirmed);
+            }
+            if wait.is_some() && !confirmed {
+                return Ok(false);
+            }
+        }
+    }
+    /// Automation input to the session terminal, always submitted with Enter.
+    /// Refused while the person has an unsent draft or text waits on the input
+    /// line, so orchestration does not type over human input; mail stays in the
+    /// inbox instead. Code holding the `Terminal` itself is not restricted.
+    pub fn send_automation(
+        &self,
+        terminal: &mut Terminal,
+        text: &str,
+        wait: Option<Duration>,
+    ) -> Result<bool> {
+        if !self.draft.text.is_empty() || terminal.has_pending_input() {
+            return Err(invalid("human input in progress; automation input refused"));
+        }
+        terminal.send(text, true, wait)
     }
     pub fn disconnect(&mut self) {
         self.connected = false;
