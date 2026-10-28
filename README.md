@@ -24,6 +24,10 @@ system lookup, so the global database is not a reproducible scheduling authority
 This dependency pin adds no daily calculation, automation UI or live execution;
 it is a partial foundation for #39, which remains open.
 
+portable-pty 0.9.0 (MIT, default features) is pinned for real per-worktree
+terminals (#11). It uses the Unix pseudo terminal API and Windows ConPTY. This
+pin adds no terminal API, process launch, inbox wiring or UI yet.
+
 Orca reference: https://github.com/stablyai/orca, MIT License.
 Copyright (c) 2026 Lovecast Inc. See THIRD_PARTY_NOTICES.md for the full notice.
 
