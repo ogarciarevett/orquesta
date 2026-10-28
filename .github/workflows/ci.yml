@@ -8,12 +8,19 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
       - run: cargo fmt --all --check
-      - run: cargo test --workspace
-      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo fetch --locked
+      - run: |
+          git rev-parse HEAD
+          cargo metadata --locked --offline --format-version 1
+          cargo tree --locked --offline -e features -i jiff
+      - run: cargo test --workspace --locked --offline
+      - run: cargo clippy --workspace --all-targets --locked --offline -- -D warnings
   inbox-ui:
     runs-on: ubuntu-latest
     steps:

@@ -6,8 +6,23 @@ recipients before sending. Reads, delivery replay, and acknowledgements operate
 on mailbox storage, independently of the human terminal draft. The terminal
 buffer exposes no inbox delivery or submission method.
 
-Run `cargo test` and `cargo clippy` to validate the workspace. Cargo.lock is
-currently omitted for this library workspace.
+Run `cargo test --workspace --locked` and
+`cargo clippy --workspace --all-targets --locked -- -D warnings` to validate
+the core workspace. Both root and native Cargo.lock files are tracked; dependency
+and bundled timezone-data updates require review of both resolved locks.
+CI fetches with `--locked`, then tests and lints offline against those locks.
+
+Core supports Rust 1.89. The native workspace retains its Rust 1.99.1 build
+toolchain: its existing Tauri dependencies require Rust 1.90, so the whole native
+workspace does not support 1.89. This pin changes neither toolchain.
+
+Jiff 0.2.38 uses the MIT license option, with `std` and `tzdb-bundle-always` and
+default features disabled. The reviewed lock selects jiff-core 0.1.1 and
+jiff-tzdb 0.1.9 (IANA 2026e). Future timezone calculations must explicitly use
+`TimeZoneDatabase::bundled()`; feature unification in native can also enable
+system lookup, so the global database is not a reproducible scheduling authority.
+This dependency pin adds no daily calculation, automation UI or live execution;
+it is a partial foundation for #39, which remains open.
 
 Orca reference: https://github.com/stablyai/orca, MIT License.
 Copyright (c) 2026 Lovecast Inc. See THIRD_PARTY_NOTICES.md for the full notice.
