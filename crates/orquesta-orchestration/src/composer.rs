@@ -3,7 +3,9 @@
 use crate::{
     Message, Result, TerminalDraftBuffer, invalid,
     runtime::{MailEvent, Operation, Runtime},
+    terminal::Terminal,
 };
+use std::time::Duration;
 
 pub struct SessionComposer {
     recipient: String,
@@ -57,6 +59,31 @@ impl SessionComposer {
         self.draft.cursor = 0;
         self.draft.selection = None;
         std::mem::take(&mut self.draft.text)
+    }
+    /// Sends the human draft to the session terminal line by line, then clears it.
+    /// The draft is kept if a write fails. Returns whether submission was confirmed.
+    pub fn submit_to(&mut self, terminal: &mut Terminal, wait: Option<Duration>) -> Result<bool> {
+        let mut confirmed = false;
+        for line in self.draft.text.split('\n') {
+            confirmed = terminal.send(line.trim_end_matches('\r'), true, wait)?;
+        }
+        self.submit();
+        Ok(confirmed)
+    }
+    /// Automation input to the session terminal. Refused while the person has an
+    /// unsent draft, so orchestration never types over human input; mail stays in
+    /// the inbox instead.
+    pub fn send_automation(
+        &self,
+        terminal: &mut Terminal,
+        text: &str,
+        enter: bool,
+        wait: Option<Duration>,
+    ) -> Result<bool> {
+        if !self.draft.text.is_empty() {
+            return Err(invalid("human draft in progress; automation input refused"));
+        }
+        terminal.send(text, enter, wait)
     }
     pub fn disconnect(&mut self) {
         self.connected = false;

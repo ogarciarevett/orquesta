@@ -25,8 +25,17 @@ This dependency pin adds no daily calculation, automation UI or live execution;
 it is a partial foundation for #39, which remains open.
 
 portable-pty 0.9.0 (MIT, default features) is pinned for real per-worktree
-terminals (#11). It uses the Unix pseudo terminal API and Windows ConPTY. This
-pin adds no terminal API, process launch, inbox wiring or UI yet.
+terminals (#11). It uses the Unix pseudo terminal API and Windows ConPTY.
+
+`terminal::Terminal` starts a process on a real PTY inside an existing folder.
+`send` writes one line and can press Enter; with a wait it confirms submission
+when a line break follows Enter (the cooked-mode echo; full-screen agent UIs need
+a later screen model). `read(cursor)` returns output and the next cursor from a
+1 MiB scrollback. `interrupt`, `resize`, `exit_code` and `close` act only on that
+terminal's process. `SessionComposer::submit_to` sends the human draft, and
+`send_automation` is refused while a human draft is unsent, so inbox mail never
+types over the person. Tests run a real shell on Unix CI; Windows ConPTY compiles
+but is not tested yet. No CLI, Tauri command, renderer or restore exists yet.
 
 Orca reference: https://github.com/stablyai/orca, MIT License.
 Copyright (c) 2026 Lovecast Inc. See THIRD_PARTY_NOTICES.md for the full notice.
