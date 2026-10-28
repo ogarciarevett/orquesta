@@ -219,3 +219,4 @@ pub mod composer;
 pub mod runtime;
 pub mod sidebar;
 pub mod status_bar;
+pub mod terminal;

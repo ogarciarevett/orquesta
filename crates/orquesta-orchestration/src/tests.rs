@@ -119,3 +119,14 @@ fn concurrent_retries_are_one_durable_message() -> Result<()> {
     fs::remove_dir_all(directory)?;
     Ok(())
 }
+
+#[test]
+fn terminal_reads_hold_back_a_split_utf8_character() {
+    let line = "─ok".as_bytes();
+    assert_eq!(terminal::complete(&line[..1]), 0);
+    assert_eq!(terminal::complete(&line[..2]), 0);
+    assert_eq!(terminal::complete(line), line.len());
+    assert_eq!(terminal::complete("a😀".as_bytes().split_at(4).0), 1);
+    assert_eq!(terminal::complete(b"plain"), 5);
+    assert_eq!(terminal::complete(b"bad\xff"), 4);
+}
