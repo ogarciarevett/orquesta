@@ -2,3 +2,7 @@
 members = ["crates/orquesta-orchestration"]
 exclude = ["native"]
 resolver = "2"
+
+[workspace.lints.clippy]
+# Prefer match over an if/else-if chain that compares two values.
+comparison_chain = "warn"
